@@ -1,0 +1,65 @@
+import type { ChecklistItem } from '@/types/workflow'
+import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/utils/cn'
+
+export default function StageChecklist({
+  items,
+  onToggle,
+  disabled,
+}: {
+  items: ChecklistItem[]
+  onToggle: (itemId: string, checked: boolean) => void
+  disabled?: boolean
+}) {
+  const done = items.filter((i) => i.checked).length
+  const total = items.length
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+        <span>Progresso</span>
+        <span className="font-medium text-[var(--text)]">
+          {done}/{total}
+        </span>
+      </div>
+      <div className="h-1 overflow-hidden rounded-full bg-[var(--bg-muted)]">
+        <div
+          className="h-full rounded-full bg-[var(--accent)] transition-all duration-200"
+          style={{ width: `${total ? (done / total) * 100 : 0}%` }}
+        />
+      </div>
+
+      {items.map((it) => (
+        <label
+          key={it.id}
+          className={cn(
+            'flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 transition-colors',
+            !disabled && 'cursor-pointer hover:bg-[var(--bg-muted)]',
+            disabled && 'cursor-not-allowed opacity-55',
+            it.checked && !disabled && 'border-[var(--accent-border)] bg-[var(--accent-bg)]/40'
+          )}
+        >
+          <Checkbox
+            checked={it.checked}
+            disabled={disabled}
+            onCheckedChange={(v) => onToggle(it.id, Boolean(v))}
+            className="mt-0.5"
+          />
+          <div className="min-w-0 flex-1">
+            <div
+              className={cn(
+                'text-sm text-[var(--text-h)]',
+                it.checked && 'text-[var(--text-muted)] line-through'
+              )}
+            >
+              {it.label}
+            </div>
+            <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+              {it.required ? 'Obrigatório' : 'Opcional'}
+            </div>
+          </div>
+        </label>
+      ))}
+    </div>
+  )
+}
