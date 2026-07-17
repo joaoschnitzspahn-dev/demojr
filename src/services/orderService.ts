@@ -1,9 +1,10 @@
 import { OPERADOR_FICTICIO } from '@/constants/users'
-import { WORKFLOW_STAGE_ORDER, WORKFLOW_STAGES } from '@/constants/workflowStages'
+import { getStagesForProduct, WORKFLOW_STAGES } from '@/constants/workflowStages'
 import type {
   ChecklistItem,
   Order,
   OperatorId,
+  ProductType,
   StageProgress,
   WorkflowStageId,
 } from '@/types/workflow'
@@ -23,13 +24,17 @@ function buildStageProgress(stageId: WorkflowStageId): StageProgress {
     responsible: null,
     observations: '',
     checklist: buildChecklistItems(stageId),
+    scheduledFor: null,
   }
 }
 
 export type CreateOrderInput = {
   number: string
   client: string
-  description: string
+  cpf: string
+  email: string
+  phone: string
+  product: ProductType
   observations: string
   operatorId?: OperatorId
 }
@@ -37,15 +42,19 @@ export type CreateOrderInput = {
 export function createOrder({
   number,
   client,
-  description,
+  cpf,
+  email,
+  phone,
+  product,
   observations,
   operatorId = OPERADOR_FICTICIO,
 }: CreateOrderInput): Order {
   const iso = new Date().toISOString()
   const startStageId = 1 as WorkflowStageId
   const stageLabel = WORKFLOW_STAGES[startStageId].title
+  const stageIds = getStagesForProduct(product)
 
-  const stages = WORKFLOW_STAGE_ORDER.reduce(
+  const stages = stageIds.reduce(
     (acc, stageId) => {
       acc[stageId] = buildStageProgress(stageId)
       return acc
@@ -54,7 +63,7 @@ export function createOrder({
   )
 
   stages[startStageId] = {
-    ...stages[startStageId],
+    ...stages[startStageId]!,
     startedAt: iso,
     responsible: operatorId,
   }
@@ -63,18 +72,26 @@ export function createOrder({
     id: crypto.randomUUID(),
     number,
     client,
-    description,
+    cpf,
+    email,
+    phone,
+    product,
     observations,
+    trackingCode: '',
+    imeis: '',
+    tags: '',
     createdAt: iso,
     currentStageId: startStageId,
     completedAt: null,
+    renovacaoCompletedAt: null,
     currentResponsible: operatorId,
     status: 'Pendentes',
     stages,
+    reminders: [],
     history: [
       {
         id: crypto.randomUUID(),
-        orderId: '', // preenchido abaixo
+        orderId: '',
         type: 'created',
         stageId: startStageId,
         stageLabel,

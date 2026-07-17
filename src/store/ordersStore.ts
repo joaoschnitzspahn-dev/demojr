@@ -3,18 +3,27 @@ import { persist } from 'zustand/middleware'
 import { seedMockOrders } from '@/mock/ordersMock'
 import { createOrder } from '@/services/orderService'
 import {
+  activateRenovacaoIfDue,
   completeStage,
+  ensureReminderStatuses,
   getCanCompleteStage,
   getOrderStatus as computeOrderStatus,
   toggleChecklistItem,
+  updateOrderShippingFields,
   updateStageObservations,
 } from '@/services/workflowService'
 import { canUserWorkOnStage } from '@/constants/users'
 import { useAuthStore } from '@/store/authStore'
-import type { Order, WorkflowStageId } from '@/types/workflow'
+import type { Order, ProductType, WorkflowStageId } from '@/types/workflow'
 
 function getSessionUser() {
   return useAuthStore.getState().currentUser
+}
+
+function refreshOrders(orders: Order[]): Order[] {
+  return orders.map((o) =>
+    activateRenovacaoIfDue(ensureReminderStatuses(o))
+  )
 }
 
 type OrdersState = {
@@ -31,7 +40,10 @@ type OrdersState = {
 
   createOrder: (input: {
     client: string
-    description: string
+    cpf: string
+    email: string
+    phone: string
+    product: ProductType
     observations: string
   }) => void
 
@@ -48,6 +60,13 @@ type OrdersState = {
     observations: string
   }) => void
 
+  updateShippingFields: (input: {
+    orderId: string
+    trackingCode?: string
+    imeis?: string
+    tags?: string
+  }) => { ok: boolean; error?: string }
+
   tryCompleteCurrentStage: (input: {
     orderId: string
     notes: string
@@ -55,6 +74,8 @@ type OrdersState = {
 
   getOrderById: (id: string) => Order | undefined
   getOrderStatus: (order: Order) => ReturnType<typeof computeOrderStatus>
+  getActiveOrders: () => Order[]
+  getFinishedOrders: () => Order[]
 }
 
 export const useOrdersStore = create<OrdersState>()(
@@ -68,10 +89,13 @@ export const useOrdersStore = create<OrdersState>()(
       drawerOpen: false,
 
       initialize: () => {
-        if (get().seeded) return
+        if (get().seeded) {
+          set((s) => ({ orders: refreshOrders(s.orders) }))
+          return
+        }
         set({ loading: true })
         window.setTimeout(() => {
-          const orders = seedMockOrders()
+          const orders = refreshOrders(seedMockOrders())
           set({ orders, loading: false, seeded: true })
         }, 650)
       },
@@ -96,7 +120,10 @@ export const useOrdersStore = create<OrdersState>()(
         const newOrder = createOrder({
           number: nextNumber,
           client: input.client,
-          description: input.description,
+          cpf: input.cpf,
+          email: input.email,
+          phone: input.phone,
+          product: input.product,
           observations: input.observations,
           operatorId: user.name,
         })
@@ -114,7 +141,7 @@ export const useOrdersStore = create<OrdersState>()(
         if (!canUserWorkOnStage(user, stageId)) {
           return {
             ok: false,
-            error: 'Você não tem permissão para atuar nesta etapa.',
+            error: 'Você não tem permissão para atuar neste processo.',
           }
         }
 
@@ -164,6 +191,34 @@ export const useOrdersStore = create<OrdersState>()(
         })
       },
 
+      updateShippingFields: ({ orderId, trackingCode, imeis, tags }) => {
+        const user = getSessionUser()
+        if (!user) return { ok: false, error: 'Sessão expirada.' }
+
+        const state = get()
+        const idx = state.orders.findIndex((o) => o.id === orderId)
+        if (idx === -1) return { ok: false, error: 'Pedido não encontrado.' }
+
+        try {
+          const nextOrder = updateOrderShippingFields({
+            order: state.orders[idx],
+            trackingCode,
+            imeis,
+            tags,
+            operatorId: user.name,
+          })
+          const orders = [...state.orders]
+          orders[idx] = nextOrder
+          set({ orders })
+          return { ok: true }
+        } catch (e) {
+          return {
+            ok: false,
+            error: e instanceof Error ? e.message : 'Erro ao atualizar campos.',
+          }
+        }
+      },
+
       tryCompleteCurrentStage: ({ orderId, notes }) => {
         const user = getSessionUser()
         if (!user) return { ok: false, error: 'Sessão expirada.' }
@@ -177,14 +232,17 @@ export const useOrdersStore = create<OrdersState>()(
         if (!canUserWorkOnStage(user, order.currentStageId)) {
           return {
             ok: false,
-            error: 'Você não tem permissão para concluir esta etapa.',
+            error: 'Você não tem permissão para concluir este processo.',
           }
         }
 
         if (!getCanCompleteStage(order, order.currentStageId)) {
           return {
             ok: false,
-            error: 'Checklist obrigatório incompleto.',
+            error:
+              order.currentStageId === 2 && !order.trackingCode.trim()
+                ? 'Informe o código de rastreio.'
+                : 'Checklist obrigatório incompleto.',
           }
         }
 
@@ -201,16 +259,20 @@ export const useOrdersStore = create<OrdersState>()(
         } catch (e) {
           return {
             ok: false,
-            error: e instanceof Error ? e.message : 'Erro ao concluir etapa.',
+            error: e instanceof Error ? e.message : 'Erro ao concluir processo.',
           }
         }
       },
 
       getOrderById: (id) => get().orders.find((o) => o.id === id),
       getOrderStatus: (order) => computeOrderStatus(order),
+      getActiveOrders: () =>
+        refreshOrders(get().orders).filter((o) => !o.completedAt || o.currentStageId === 6),
+      getFinishedOrders: () =>
+        get().orders.filter((o) => Boolean(o.completedAt)),
     }),
     {
-      name: 'orders-workflow-v2',
+      name: 'orders-workflow-v3',
       partialize: (state) => ({
         orders: state.orders,
         seeded: state.seeded,

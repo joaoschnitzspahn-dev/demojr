@@ -85,7 +85,7 @@ export default function UsuariosAdminPage() {
             Usuários & atribuições
           </h1>
           <p className="mt-1 max-w-xl text-sm text-[var(--text-muted)]">
-            Crie operadores e defina em quais etapas cada um pode atuar.
+            Crie operadores e defina em quais processos cada um pode atuar.
           </p>
         </div>
 

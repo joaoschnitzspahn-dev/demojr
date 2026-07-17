@@ -3,7 +3,7 @@ import type { AppUser, WorkflowStageId } from '@/types/workflow'
 export const ADMIN_LOGIN = 'adm'
 export const ADMIN_PASSWORD = 'adm123'
 
-const ALL_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6, 7, 8]
+const ALL_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6]
 
 export const DEFAULT_ADMIN: AppUser = {
   id: 'user-admin-master',

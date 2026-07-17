@@ -1,4 +1,7 @@
-export type WorkflowStageId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+/** Processos do fluxo operacional (1–5 sempre; 6 só Mini Rastreador). */
+export type WorkflowStageId = 1 | 2 | 3 | 4 | 5 | 6
+
+export type ProductType = 'mini_rastreador' | 'lv12_4g'
 
 export type OperatorId = string
 
@@ -10,7 +13,7 @@ export type AppUser = {
   password: string
   name: string
   role: UserRole
-  /** Etapas que o operador pode executar. Admin ignora (acesso total). */
+  /** Processos que o operador pode executar. Admin ignora (acesso total). */
   assignedStages: WorkflowStageId[]
   active: boolean
   createdAt: string
@@ -23,7 +26,7 @@ export type ChecklistItem = {
   checked: boolean
 }
 
-export type StageState = 'locked' | 'active' | 'completed'
+export type StageState = 'locked' | 'active' | 'completed' | 'scheduled'
 
 export type StageProgress = {
   stageId: WorkflowStageId
@@ -32,9 +35,18 @@ export type StageProgress = {
   responsible: OperatorId | null
   observations: string
   checklist: ChecklistItem[]
+  /** Data em que o processo agendado fica disponível (ex.: Renovação). */
+  scheduledFor: string | null
 }
 
-export type HistoryEventType = 'started' | 'completed' | 'released' | 'created'
+export type HistoryEventType =
+  | 'started'
+  | 'completed'
+  | 'released'
+  | 'created'
+  | 'scheduled'
+  | 'reminder'
+  | 'field_updated'
 
 export type OrderHistoryEvent = {
   id: string
@@ -50,22 +62,44 @@ export type OrderHistoryEvent = {
 
 export type OrderStatus = 'Pendentes' | 'Em Andamento' | 'Concluídos'
 
+export type OrderReminder = {
+  id: string
+  type: 'pos_venda_7d' | 'renovacao_5m'
+  stageId: WorkflowStageId
+  dueAt: string
+  status: 'pending' | 'due' | 'done'
+  label: string
+}
+
 export type Order = {
   id: string
   number: string
   client: string
+  cpf: string
+  email: string
+  phone: string
+  product: ProductType
   createdAt: string
-  description: string
   observations: string
+
+  /** Código de rastreio (preenchido na Expedição). */
+  trackingCode: string
+  /** IMEIs informados na Expedição — preparado para importação Excel. */
+  imeis: string
+  /** Tags catalogadas. */
+  tags: string
 
   currentStageId: WorkflowStageId
   completedAt: string | null
+  /** Conclusão do processo de Renovação (Mini Rastreador). */
+  renovacaoCompletedAt: string | null
   currentResponsible: OperatorId
   status: OrderStatus
 
-  stages: Record<WorkflowStageId, StageProgress>
+  stages: Partial<Record<WorkflowStageId, StageProgress>>
+  reminders: OrderReminder[]
   history: OrderHistoryEvent[]
 }
 
-/** @deprecated use AppUser — mantido só se algum import residual existir */
+/** @deprecated use AppUser */
 export type User = AppUser

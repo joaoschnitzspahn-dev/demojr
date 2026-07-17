@@ -7,6 +7,9 @@ const typeDot: Record<OrderHistoryEvent['type'], string> = {
   started: 'bg-sky-500',
   completed: 'bg-[var(--success)]',
   released: 'bg-zinc-400',
+  scheduled: 'bg-amber-500',
+  reminder: 'bg-orange-400',
+  field_updated: 'bg-violet-400',
 }
 
 export default function HistoryTimeline({
@@ -50,10 +53,20 @@ export default function HistoryTimeline({
               <span className="text-[11px] text-[var(--text-muted)]">
                 {formatDate(ev.occurredAt)}
               </span>
+              {ev.stageLabel ? (
+                <span className="text-[11px] text-[var(--text-muted)]">
+                  · {ev.stageLabel}
+                </span>
+              ) : null}
             </div>
             <p className="mt-1 text-sm leading-relaxed text-[var(--text)]">
               {ev.message}
             </p>
+            {ev.responsible ? (
+              <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                Responsável: {ev.responsible}
+              </p>
+            ) : null}
             {ev.notes?.trim() ? (
               <p className="mt-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-muted)] px-2.5 py-1.5 text-xs text-[var(--text-muted)]">
                 {ev.notes}

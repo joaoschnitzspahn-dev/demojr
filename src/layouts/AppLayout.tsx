@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Plus, Users } from 'lucide-react'
+import { Archive, LayoutGrid, LogOut, Plus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/utils/cn'
 import { Toaster } from '@/components/ui/toast'
@@ -48,7 +48,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
-                  Dashboard
+                  Pedidos
+                </Button>
+              </Link>
+              <Link to="/finalizados">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    location.pathname === '/finalizados' &&
+                      'bg-[var(--bg-muted)] text-[var(--text-h)]'
+                  )}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  Finalizados
                 </Button>
               </Link>
               {isAdmin ? (

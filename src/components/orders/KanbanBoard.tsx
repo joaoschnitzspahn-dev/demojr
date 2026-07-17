@@ -1,8 +1,13 @@
 import * as React from 'react'
 import type { Order, WorkflowStageId } from '@/types/workflow'
-import { WORKFLOW_STAGE_ORDER, WORKFLOW_STAGES } from '@/constants/workflowStages'
+import {
+  ALL_WORKFLOW_STAGES,
+  BASE_WORKFLOW_STAGES,
+  WORKFLOW_STAGES,
+} from '@/constants/workflowStages'
 import OrderKanbanCard from '@/components/orders/OrderKanbanCard'
 import { Skeleton } from '@/components/ui/skeleton'
+import { isActiveBoardOrder } from '@/services/workflowService'
 
 function StageColumn({
   stageId,
@@ -14,11 +19,11 @@ function StageColumn({
   loading: boolean
 }) {
   return (
-    <section className="w-[260px] min-w-[260px] max-w-[260px] space-y-2.5">
+    <section className="w-[240px] min-w-[240px] max-w-[240px] space-y-2.5">
       <header className="flex items-center justify-between gap-2 px-0.5">
         <div className="min-w-0">
           <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-            Etapa {stageId}
+            Processo {stageId}
           </div>
           <div className="truncate text-sm font-medium text-[var(--text-h)]">
             {WORKFLOW_STAGES[stageId].title}
@@ -55,19 +60,29 @@ export default function KanbanBoard({
   orders: Order[]
   loading: boolean
 }) {
+  const boardOrders = React.useMemo(
+    () => orders.filter(isActiveBoardOrder),
+    [orders]
+  )
+
+  const columns = React.useMemo(() => {
+    const hasRenovacao = boardOrders.some((o) => Boolean(o.stages[6]))
+    return hasRenovacao ? ALL_WORKFLOW_STAGES : BASE_WORKFLOW_STAGES
+  }, [boardOrders])
+
   const grouped = React.useMemo(() => {
     const map = new Map<WorkflowStageId, Order[]>()
-    for (const sid of WORKFLOW_STAGE_ORDER) map.set(sid, [])
-    for (const order of orders) {
+    for (const sid of columns) map.set(sid, [])
+    for (const order of boardOrders) {
       map.get(order.currentStageId)?.push(order)
     }
     return map
-  }, [orders])
+  }, [boardOrders, columns])
 
   return (
     <div className="mt-6">
       <div className="flex gap-3 overflow-x-auto pb-2">
-        {WORKFLOW_STAGE_ORDER.map((stageId) => (
+        {columns.map((stageId) => (
           <StageColumn
             key={stageId}
             stageId={stageId}

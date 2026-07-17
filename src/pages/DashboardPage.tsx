@@ -8,7 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useOrdersStore } from '@/store/ordersStore'
 import { useInitializeOrders } from '@/hooks/useInitializeOrders'
 import { isToday } from '@/utils/date'
-import { getOrderStatus } from '@/services/workflowService'
+import {
+  getDueReminders,
+  getOrderStatus,
+  isActiveBoardOrder,
+} from '@/services/workflowService'
 
 function StatCard({
   title,
@@ -48,6 +52,11 @@ export default function DashboardPage() {
   const orders = useOrdersStore((s) => s.orders)
   const loading = useOrdersStore((s) => s.loading)
 
+  const activeOrders = React.useMemo(
+    () => orders.filter(isActiveBoardOrder),
+    [orders]
+  )
+
   const todayCount = React.useMemo(
     () => orders.filter((o) => isToday(o.createdAt)).length,
     [orders]
@@ -58,13 +67,18 @@ export default function DashboardPage() {
   )
   const pendingCount = React.useMemo(
     () =>
-      orders.filter(
+      activeOrders.filter(
         (o) => o.currentStageId === 1 && getOrderStatus(o) !== 'Concluídos'
       ).length,
-    [orders]
+    [activeOrders]
   )
   const inProgressCount = React.useMemo(
-    () => orders.filter((o) => getOrderStatus(o) === 'Em Andamento').length,
+    () => activeOrders.filter((o) => getOrderStatus(o) === 'Em Andamento').length,
+    [activeOrders]
+  )
+  const dueAlerts = React.useMemo(
+    () =>
+      orders.reduce((acc, o) => acc + getDueReminders(o).length, 0),
     [orders]
   )
 
@@ -73,10 +87,11 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-h)]">
-            Pedidos
+            Pedidos ativos
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Acompanhe o fluxo operacional em 8 etapas fixas.
+            Fluxo operacional: Cadastro → Expedição → Entrega → Recebimento →
+            Pós-venda.
           </p>
         </div>
 
@@ -88,7 +103,7 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Pedidos hoje"
           value={todayCount}
@@ -96,32 +111,38 @@ export default function DashboardPage() {
           subtitle="Criados hoje"
         />
         <StatCard
-          title="Pendentes"
+          title="Cadastro"
           value={pendingCount}
           loading={loading}
-          subtitle="Recebimento"
+          subtitle="Processo 1"
         />
         <StatCard
           title="Em andamento"
           value={inProgressCount}
           loading={loading}
-          subtitle="Etapas 2–7"
+          subtitle="Processos 2–5"
         />
         <StatCard
-          title="Concluídos"
+          title="Alertas"
+          value={dueAlerts}
+          loading={loading}
+          subtitle="Tarefas vencidas"
+        />
+        <StatCard
+          title="Finalizados"
           value={completedCount}
           loading={loading}
-          subtitle="Fluxo finalizado"
+          subtitle="Pós-venda ok"
         />
       </div>
 
-      {!loading && orders.length === 0 ? (
+      {!loading && activeOrders.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-elevated)] p-10 text-center">
           <p className="text-sm font-medium text-[var(--text-h)]">
-            Nenhum pedido no fluxo
+            Nenhum pedido ativo no fluxo
           </p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Crie o primeiro pedido para iniciar.
+            Crie o primeiro pedido ou consulte Pedidos Finalizados.
           </p>
           <div className="mt-5">
             <Link to="/cadastro">

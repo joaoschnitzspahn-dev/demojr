@@ -1,8 +1,13 @@
 import type { ComponentProps } from 'react'
-import { Clock, Lock, User2 } from 'lucide-react'
+import { AlertTriangle, Clock, Lock, User2 } from 'lucide-react'
 import type { Order, WorkflowStageId } from '@/types/workflow'
 import { formatDuration } from '@/utils/date'
-import { getOrderStatus, getStageState } from '@/services/workflowService'
+import {
+  getDueReminders,
+  getOrderStatus,
+  getStageState,
+} from '@/services/workflowService'
+import { PRODUCT_LABELS } from '@/constants/products'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/utils/cn'
 import { useOrdersStore } from '@/store/ordersStore'
@@ -26,11 +31,12 @@ export default function OrderKanbanCard({
   const selectOrder = useOrdersStore((s) => s.selectOrder)
   const stageProgress = order.stages[stageId]
   const stageState = getStageState(order, stageId)
-  const startedAt = stageProgress.startedAt
+  const startedAt = stageProgress?.startedAt
   const durationLabel = startedAt
-    ? formatDuration(startedAt, stageProgress.finishedAt ?? undefined)
+    ? formatDuration(startedAt, stageProgress?.finishedAt ?? undefined)
     : '—'
   const status = getOrderStatus(order)
+  const due = getDueReminders(order)
 
   return (
     <button
@@ -39,7 +45,8 @@ export default function OrderKanbanCard({
         'w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-3.5 text-left shadow-[var(--shadow-sm)] transition-colors duration-150',
         'hover:border-[#d4d4d8] hover:bg-[var(--bg-card-hover)]',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
-        stageState === 'active' && 'border-[var(--accent-border)]'
+        stageState === 'active' && 'border-[var(--accent-border)]',
+        due.length > 0 && 'border-amber-300'
       )}
     >
       <div className="space-y-2.5">
@@ -50,6 +57,9 @@ export default function OrderKanbanCard({
             </div>
             <div className="mt-0.5 truncate text-sm font-medium text-[var(--text-h)]">
               {order.client}
+            </div>
+            <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
+              {PRODUCT_LABELS[order.product]}
             </div>
           </div>
           <Badge variant={statusBadge[status]}>{status}</Badge>
@@ -64,10 +74,16 @@ export default function OrderKanbanCard({
             <Clock className="h-3 w-3" />
             <span>{durationLabel}</span>
           </div>
+          {due.length > 0 ? (
+            <div className="flex items-center gap-1 text-[11px] font-medium text-[var(--warning)]">
+              <AlertTriangle className="h-3 w-3" />
+              Tarefa pendente
+            </div>
+          ) : null}
           {stageState === 'locked' ? (
             <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
               <Lock className="h-3 w-3" />
-              Bloqueada
+              Bloqueado
             </div>
           ) : null}
         </div>

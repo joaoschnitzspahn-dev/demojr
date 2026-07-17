@@ -1,16 +1,20 @@
-import { Check, Lock, Circle } from 'lucide-react'
-import { WORKFLOW_STAGE_ORDER, WORKFLOW_STAGES } from '@/constants/workflowStages'
-import { getStageState } from '@/services/workflowService'
+import { Check, Lock, Circle, CalendarClock } from 'lucide-react'
+import { WORKFLOW_STAGES } from '@/constants/workflowStages'
+import { getPipelineStages, getStageState } from '@/services/workflowService'
 import type { Order } from '@/types/workflow'
 import { cn } from '@/utils/cn'
+import { formatDate } from '@/utils/date'
 
 export default function StagePipeline({ order }: { order: Order }) {
+  const stages = getPipelineStages(order)
+
   return (
     <div className="overflow-x-auto pb-1">
       <div className="flex min-w-max items-center gap-1">
-        {WORKFLOW_STAGE_ORDER.map((stageId, index) => {
+        {stages.map((stageId, index) => {
           const state = getStageState(order, stageId)
           const title = WORKFLOW_STAGES[stageId].title
+          const scheduledFor = order.stages[stageId]?.scheduledFor
 
           return (
             <div key={stageId} className="flex items-center gap-1">
@@ -21,19 +25,27 @@ export default function StagePipeline({ order }: { order: Order }) {
                     'border-[var(--accent-border)] bg-[var(--accent-bg)] text-[var(--accent)]',
                   state === 'completed' &&
                     'border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]',
+                  state === 'scheduled' &&
+                    'border-amber-200 bg-[var(--warning-bg)] text-[var(--warning)]',
                   state === 'locked' &&
                     'border-[var(--border)] bg-[var(--bg-muted)] text-[var(--text-muted)]'
                 )}
                 title={
                   state === 'locked'
-                    ? 'Bloqueada'
+                    ? 'Bloqueado'
                     : state === 'completed'
-                      ? 'Concluída'
-                      : 'Ativa'
+                      ? 'Concluído'
+                      : state === 'scheduled'
+                        ? scheduledFor
+                          ? `Agendado para ${formatDate(scheduledFor)}`
+                          : 'Agendado'
+                        : 'Ativo'
                 }
               >
                 {state === 'completed' ? (
                   <Check className="h-3 w-3" />
+                ) : state === 'scheduled' ? (
+                  <CalendarClock className="h-3 w-3" />
                 ) : state === 'locked' ? (
                   <Lock className="h-3 w-3" />
                 ) : (
@@ -43,7 +55,7 @@ export default function StagePipeline({ order }: { order: Order }) {
                   {stageId}. {title}
                 </span>
               </div>
-              {index < WORKFLOW_STAGE_ORDER.length - 1 ? (
+              {index < stages.length - 1 ? (
                 <div
                   className={cn(
                     'h-px w-2.5',

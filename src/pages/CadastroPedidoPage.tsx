@@ -9,10 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrdersStore } from '@/store/ordersStore'
 import { toast } from '@/components/ui/toast'
 import { useAuthStore } from '@/store/authStore'
+import { PRODUCT_OPTIONS } from '@/constants/products'
+import type { ProductType } from '@/types/workflow'
 
 const schema = z.object({
   client: z.string().min(2, 'Informe o nome do cliente.'),
-  description: z.string().min(2, 'Informe a descrição do pedido.'),
+  cpf: z.string().min(11, 'Informe o CPF.'),
+  email: z.string().email('Informe um e-mail válido.'),
+  phone: z.string().min(8, 'Informe o telefone.'),
+  product: z.enum(['mini_rastreador', 'lv12_4g'], {
+    message: 'Selecione o produto.',
+  }),
   observations: z.string().optional(),
 })
 
@@ -29,18 +36,28 @@ export default function CadastroPedidoPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { client: '', description: '', observations: '' },
+    defaultValues: {
+      client: '',
+      cpf: '',
+      email: '',
+      phone: '',
+      product: 'mini_rastreador',
+      observations: '',
+    },
   })
 
   function onSubmit(values: FormValues) {
     createOrder({
       client: values.client,
-      description: values.description,
+      cpf: values.cpf,
+      email: values.email,
+      phone: values.phone,
+      product: values.product as ProductType,
       observations: values.observations ?? '',
     })
     toast.success(
       'Pedido criado',
-      `Recebimento iniciado por ${currentUser?.name ?? 'usuário'}.`
+      `Cadastro iniciado por ${currentUser?.name ?? 'usuário'}.`
     )
     navigate('/')
   }
@@ -52,7 +69,8 @@ export default function CadastroPedidoPage() {
           Novo pedido
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Ao salvar, o pedido entra automaticamente na etapa Recebimento.
+          O número do pedido é gerado automaticamente. Ao salvar, o fluxo inicia
+          em Cadastro do Pedido.
         </p>
       </div>
 
@@ -64,7 +82,7 @@ export default function CadastroPedidoPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
-                Cliente
+                Nome do cliente
               </label>
               <Input
                 className="mt-1.5"
@@ -78,20 +96,78 @@ export default function CadastroPedidoPage() {
               ) : null}
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-[var(--text-h)]">
+                  CPF
+                </label>
+                <Input
+                  className="mt-1.5"
+                  placeholder="000.000.000-00"
+                  {...register('cpf')}
+                />
+                {errors.cpf ? (
+                  <p className="mt-1.5 text-xs text-[var(--danger)]">
+                    {errors.cpf.message}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[var(--text-h)]">
+                  Telefone
+                </label>
+                <Input
+                  className="mt-1.5"
+                  placeholder="(00) 00000-0000"
+                  {...register('phone')}
+                />
+                {errors.phone ? (
+                  <p className="mt-1.5 text-xs text-[var(--danger)]">
+                    {errors.phone.message}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
-                Descrição
+                E-mail
               </label>
-              <Textarea
+              <Input
                 className="mt-1.5"
-                placeholder="Descreva o pedido..."
-                {...register('description')}
+                type="email"
+                placeholder="cliente@email.com"
+                {...register('email')}
               />
-              {errors.description ? (
+              {errors.email ? (
                 <p className="mt-1.5 text-xs text-[var(--danger)]">
-                  {errors.description.message}
+                  {errors.email.message}
                 </p>
               ) : null}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-[var(--text-h)]">
+                Produto
+              </label>
+              <select
+                className="mt-1.5 flex h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-h)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+                {...register('product')}
+              >
+                {PRODUCT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {errors.product ? (
+                <p className="mt-1.5 text-xs text-[var(--danger)]">
+                  {errors.product.message}
+                </p>
+              ) : null}
+              <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                Mini Rastreador inclui automaticamente o processo de Renovação.
+              </p>
             </div>
 
             <div>
@@ -100,7 +176,7 @@ export default function CadastroPedidoPage() {
               </label>
               <Textarea
                 className="mt-1.5"
-                placeholder="Opcional"
+                placeholder="Observações do pedido"
                 {...register('observations')}
               />
             </div>

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './layouts/AppLayout'
 import DashboardPage from './pages/DashboardPage'
 import CadastroPedidoPage from './pages/CadastroPedidoPage'
+import PedidosFinalizadosPage from './pages/PedidosFinalizadosPage'
 import LoginPage from './pages/LoginPage'
 import UsuariosAdminPage from './pages/UsuariosAdminPage'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -36,6 +37,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <CadastroPedidoPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/finalizados"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PedidosFinalizadosPage />
             </AppLayout>
           </ProtectedRoute>
         }
