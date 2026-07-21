@@ -447,7 +447,7 @@ export const useOrdersStore = create<OrdersState>()(
         get().orders.filter((o) => Boolean(o.completedAt)),
     }),
     {
-      name: 'orders-workflow-v3',
+      name: 'orders-workflow-v4',
       partialize: (state) => ({
         orders: state.orders,
         seeded: state.seeded,
