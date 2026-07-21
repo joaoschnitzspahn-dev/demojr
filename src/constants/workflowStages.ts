@@ -43,16 +43,6 @@ export const WORKFLOW_STAGES: Record<
     description: 'Preparar e enviar o equipamento.',
     checklistTemplate: [
       { id: 'imprimir', label: 'Imprimir pedido', required: true },
-      {
-        id: 'imeis',
-        label: 'Informar IMEIs das Tags/Rastreadores',
-        required: true,
-      },
-      {
-        id: 'excel_import',
-        label: 'Importar IMEIs por planilha (quando aplicável)',
-        required: false,
-      },
       { id: 'lacres', label: 'Retirar lacres', required: true },
       { id: 'embalar', label: 'Embalar para envio', required: true },
       {

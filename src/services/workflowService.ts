@@ -528,14 +528,14 @@ export function updateOrderShippingFields({
   }
 
   const stage = next.stages[2]
-  if (stage && imeis !== undefined) {
-    const hasImeis = imeis.trim().length > 0
+  if (stage && trackingCode !== undefined) {
+    const hasTracking = trackingCode.trim().length > 0
     next.stages = {
       ...next.stages,
       2: {
         ...stage,
         checklist: stage.checklist.map((item) =>
-          item.id === 'imeis' ? { ...item, checked: hasImeis } : item
+          item.id === 'rastreio' ? { ...item, checked: hasTracking } : item
         ),
       },
     }
@@ -557,7 +557,7 @@ export function updateOrderShippingFields({
   return { ...next, history: [...order.history, event] }
 }
 
-/** Aplica IMEIs importados de planilha e marca o checklist. */
+/** Aplica IMEIs importados de planilha. */
 export function applyImeiSpreadsheetImport({
   order,
   imeis,
@@ -579,8 +579,9 @@ export function applyImeiSpreadsheetImport({
     throw new WorkflowError('Nenhum IMEI encontrado na planilha.')
   }
 
-  const stage = order.stages[2]
-  if (!stage) throw new WorkflowError('Processo de Expedição não encontrado.')
+  if (!order.stages[2]) {
+    throw new WorkflowError('Processo de Expedição não encontrado.')
+  }
 
   const imeiText = imeis.join('\n')
   const event = createHistoryEvent({
@@ -597,17 +598,6 @@ export function applyImeiSpreadsheetImport({
   return {
     ...order,
     imeis: imeiText,
-    stages: {
-      ...order.stages,
-      2: {
-        ...stage,
-        checklist: stage.checklist.map((item) =>
-          item.id === 'imeis' || item.id === 'excel_import'
-            ? { ...item, checked: true }
-            : item
-        ),
-      },
-    },
     history: [...order.history, event],
   }
 }
