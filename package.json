@@ -23,6 +23,8 @@
     "@radix-ui/react-toast": "^1.2.19",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.24.0",
     "react": "^19.2.7",
@@ -31,10 +33,9 @@
     "react-router-dom": "^7.18.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3",
-    "zustand": "^5.0.14",
-    "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

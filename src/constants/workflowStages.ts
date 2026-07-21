@@ -49,11 +49,10 @@ export const WORKFLOW_STAGES: Record<
         required: true,
       },
       {
-        id: 'excel_prep',
-        label: 'Preparar estrutura para futura importação via Excel',
-        required: true,
+        id: 'excel_import',
+        label: 'Importar IMEIs por planilha (quando aplicável)',
+        required: false,
       },
-      { id: 'catalogar', label: 'Catalogar as Tags', required: true },
       { id: 'lacres', label: 'Retirar lacres', required: true },
       { id: 'embalar', label: 'Embalar para envio', required: true },
       {

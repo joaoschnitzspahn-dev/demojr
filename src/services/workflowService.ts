@@ -1,6 +1,7 @@
 import {
   getStageTitle,
   getStagesForProduct,
+  WORKFLOW_STAGES,
 } from '@/constants/workflowStages'
 import { requiresRenovacao } from '@/constants/products'
 import { OPERADOR_FICTICIO } from '@/constants/users'
@@ -62,6 +63,46 @@ export function ensureReminderStatuses(order: Order, now = new Date()): Order {
   })
   if (!changed) return order
   return { ...order, reminders }
+}
+
+/** Alinha checklists dos pedidos ao template atual (migração suave). */
+export function syncChecklistsWithTemplates(order: Order): Order {
+  const stageIds = getStagesForProduct(order.product)
+  let changed = false
+  const stages = { ...order.stages }
+
+  for (const stageId of stageIds) {
+    const stage = stages[stageId]
+    if (!stage) continue
+    const template = WORKFLOW_STAGES[stageId].checklistTemplate
+    const byId = new Map(stage.checklist.map((i) => [i.id, i]))
+    const nextChecklist = template.map((t) => {
+      const existing = byId.get(t.id)
+      return {
+        id: t.id,
+        label: t.label,
+        required: t.required,
+        checked: existing?.checked ?? false,
+      }
+    })
+
+    const same =
+      nextChecklist.length === stage.checklist.length &&
+      nextChecklist.every(
+        (item, idx) =>
+          item.id === stage.checklist[idx]?.id &&
+          item.required === stage.checklist[idx]?.required &&
+          item.label === stage.checklist[idx]?.label
+      )
+
+    if (!same) {
+      changed = true
+      stages[stageId] = { ...stage, checklist: nextChecklist }
+    }
+  }
+
+  if (!changed) return order
+  return { ...order, stages }
 }
 
 /** Estado do processo no fluxo. */
@@ -461,13 +502,11 @@ export function updateOrderShippingFields({
   order,
   trackingCode,
   imeis,
-  tags,
   operatorId = OPERADOR_FICTICIO,
 }: {
   order: Order
   trackingCode?: string
   imeis?: string
-  tags?: string
   operatorId?: OperatorId
 }): Order {
   if (getStageState(order, 2) !== 'active') {
@@ -487,12 +526,22 @@ export function updateOrderShippingFields({
     next.imeis = imeis
     changes.push('IMEIs atualizados')
   }
-  if (tags !== undefined && tags !== order.tags) {
-    next.tags = tags
-    changes.push('Tags atualizadas')
+
+  const stage = next.stages[2]
+  if (stage && imeis !== undefined) {
+    const hasImeis = imeis.trim().length > 0
+    next.stages = {
+      ...next.stages,
+      2: {
+        ...stage,
+        checklist: stage.checklist.map((item) =>
+          item.id === 'imeis' ? { ...item, checked: hasImeis } : item
+        ),
+      },
+    }
   }
 
-  if (changes.length === 0) return order
+  if (changes.length === 0) return next
 
   const event = createHistoryEvent({
     orderId: order.id,
@@ -506,6 +555,61 @@ export function updateOrderShippingFields({
   })
 
   return { ...next, history: [...order.history, event] }
+}
+
+/** Aplica IMEIs importados de planilha e marca o checklist. */
+export function applyImeiSpreadsheetImport({
+  order,
+  imeis,
+  fileName,
+  operatorId = OPERADOR_FICTICIO,
+}: {
+  order: Order
+  imeis: string[]
+  fileName: string
+  operatorId?: OperatorId
+}): Order {
+  if (getStageState(order, 2) !== 'active') {
+    throw new WorkflowError(
+      'Importação de planilha só é permitida na Expedição ativa.'
+    )
+  }
+
+  if (imeis.length === 0) {
+    throw new WorkflowError('Nenhum IMEI encontrado na planilha.')
+  }
+
+  const stage = order.stages[2]
+  if (!stage) throw new WorkflowError('Processo de Expedição não encontrado.')
+
+  const imeiText = imeis.join('\n')
+  const event = createHistoryEvent({
+    orderId: order.id,
+    type: 'field_updated',
+    stageId: 2,
+    stageLabel: getStageTitle(2),
+    occurredAt: new Date().toISOString(),
+    responsible: operatorId,
+    message: `${operatorId} importou ${imeis.length} IMEI(s) da planilha "${fileName}".`,
+    notes: '',
+  })
+
+  return {
+    ...order,
+    imeis: imeiText,
+    stages: {
+      ...order.stages,
+      2: {
+        ...stage,
+        checklist: stage.checklist.map((item) =>
+          item.id === 'imeis' || item.id === 'excel_import'
+            ? { ...item, checked: true }
+            : item
+        ),
+      },
+    },
+    history: [...order.history, event],
+  }
 }
 
 /** Vincula o nº Prontosoft ao pedido e marca o checklist automaticamente. */

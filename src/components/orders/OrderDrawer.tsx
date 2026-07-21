@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import { canUserWorkOnStage } from '@/constants/users'
 import { WORKFLOW_STAGES } from '@/constants/workflowStages'
 import { PRODUCT_LABELS } from '@/constants/products'
 import { formatDate, formatTime } from '@/utils/date'
+import { parseImeisFromSpreadsheet } from '@/utils/imeiImport'
 import { toast } from '@/components/ui/toast'
 
 export default function OrderDrawer() {
@@ -39,11 +40,16 @@ export default function OrderDrawer() {
   )
   const updateShippingFields = useOrdersStore((s) => s.updateShippingFields)
   const updateProntosoftNumber = useOrdersStore((s) => s.updateProntosoftNumber)
+  const importImeisFromSpreadsheet = useOrdersStore(
+    (s) => s.importImeisFromSpreadsheet
+  )
   const tryCompleteCurrentStage = useOrdersStore(
     (s) => s.tryCompleteCurrentStage
   )
 
   const [notes, setNotes] = React.useState('')
+  const [importingSheet, setImportingSheet] = React.useState(false)
+  const sheetInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     if (!drawerOpen || !order) {
@@ -210,7 +216,7 @@ export default function OrderDrawer() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-xs text-[var(--text-muted)]">
-                    Rastreio / Tag
+                    Rastreio / IMEIs
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0.5 text-xs text-[var(--text)]">
@@ -221,7 +227,12 @@ export default function OrderDrawer() {
                     </span>
                   </div>
                   <div>
-                    Tag: <span className="font-mono">{order.tags || '—'}</span>
+                    IMEIs:{' '}
+                    <span className="font-mono">
+                      {order.imeis.trim()
+                        ? `${order.imeis.trim().split(/\n+/).filter(Boolean).length} informado(s)`
+                        : '—'}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -261,8 +272,8 @@ export default function OrderDrawer() {
                     <CardHeader>
                       <CardTitle>Dados de expedição</CardTitle>
                       <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        Estrutura preparada para futura importação de IMEIs via
-                        Excel.
+                        Informe IMEIs manualmente ou importe de uma planilha
+                        (.xlsx, .xls ou .csv).
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -287,9 +298,79 @@ export default function OrderDrawer() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-[var(--text-h)]">
-                          IMEIs das Tags/Rastreadores
-                        </label>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-xs font-medium text-[var(--text-h)]">
+                            IMEIs das Tags/Rastreadores
+                          </label>
+                          <div>
+                            <input
+                              ref={sheetInputRef}
+                              type="file"
+                              accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                              className="hidden"
+                              disabled={checklistDisabled || importingSheet}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0]
+                                e.target.value = ''
+                                if (!file) return
+
+                                setImportingSheet(true)
+                                try {
+                                  const { imeis, count } =
+                                    await parseImeisFromSpreadsheet(file)
+                                  if (count === 0) {
+                                    toast.error(
+                                      'Planilha vazia',
+                                      'Nenhum IMEI encontrado. Use uma coluna IMEI ou uma lista de números.'
+                                    )
+                                    return
+                                  }
+
+                                  const result = importImeisFromSpreadsheet({
+                                    orderId: order.id,
+                                    imeis,
+                                    fileName: file.name,
+                                  })
+                                  if (!result.ok) {
+                                    toast.error(
+                                      'Não foi possível importar',
+                                      result.error
+                                    )
+                                    return
+                                  }
+
+                                  toast.success(
+                                    'Planilha importada',
+                                    `${count} IMEI(s) vinculados ao pedido.`
+                                  )
+                                } catch {
+                                  toast.error(
+                                    'Arquivo inválido',
+                                    'Não foi possível ler a planilha.'
+                                  )
+                                } finally {
+                                  setImportingSheet(false)
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={checklistDisabled || importingSheet}
+                              onClick={() => sheetInputRef.current?.click()}
+                            >
+                              {importingSheet ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <FileSpreadsheet className="h-3.5 w-3.5" />
+                              )}
+                              {importingSheet
+                                ? 'Importando...'
+                                : 'Inserir por planilha'}
+                            </Button>
+                          </div>
+                        </div>
                         <Textarea
                           className="mt-1.5 font-mono text-xs"
                           value={order.imeis}
@@ -302,23 +383,11 @@ export default function OrderDrawer() {
                             })
                           }}
                         />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-[var(--text-h)]">
-                          Tags catalogadas
-                        </label>
-                        <Input
-                          className="mt-1.5 font-mono"
-                          value={order.tags}
-                          disabled={checklistDisabled}
-                          placeholder="Ex.: TAG-1001"
-                          onChange={(e) => {
-                            updateShippingFields({
-                              orderId: order.id,
-                              tags: e.target.value,
-                            })
-                          }}
-                        />
+                        <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                          Aceita Excel/CSV com coluna &quot;IMEI&quot; ou lista
+                          de números. A importação preenche o campo e marca o
+                          checklist.
+                        </p>
                       </div>
                     </CardContent>
                   </Card>

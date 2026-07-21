@@ -26,7 +26,6 @@ function matchesQuery(order: Order, q: string) {
     order.trackingCode,
     order.product,
     PRODUCT_LABELS[order.product],
-    order.tags,
     order.imeis,
     order.currentResponsible,
     order.completedAt ? formatDate(order.completedAt) : '',
