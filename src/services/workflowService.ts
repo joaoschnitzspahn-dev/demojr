@@ -106,6 +106,7 @@ export function getCanCompleteStage(order: Order, stageId: WorkflowStageId) {
   if (!isStageEditable(order, stageId)) return false
   const stage = order.stages[stageId]
   if (!stage) return false
+  if (stageId === 1 && !order.prontosoftOrderNumber.trim()) return false
   if (stageId === 2 && !order.trackingCode.trim()) return false
   return isChecklistComplete(stage)
 }
@@ -501,6 +502,61 @@ export function updateOrderShippingFields({
     occurredAt: new Date().toISOString(),
     responsible: operatorId,
     message: `${operatorId} atualizou: ${changes.join(', ')}.`,
+    notes: '',
+  })
+
+  return { ...next, history: [...order.history, event] }
+}
+
+/** Vincula o nº Prontosoft ao pedido e marca o checklist automaticamente. */
+export function updateProntosoftOrderNumber({
+  order,
+  value,
+  operatorId = OPERADOR_FICTICIO,
+}: {
+  order: Order
+  value: string
+  operatorId?: OperatorId
+}): Order {
+  if (!isStageEditable(order, 1)) {
+    throw new WorkflowError(
+      'O número Prontosoft só pode ser informado no Cadastro do Pedido ativo.'
+    )
+  }
+
+  const trimmed = value.trim()
+  const previous = order.prontosoftOrderNumber.trim()
+
+  const stage = order.stages[1]
+  if (!stage) throw new WorkflowError('Processo de Cadastro não encontrado.')
+
+  const nextChecklist = stage.checklist.map((item) =>
+    item.id === 'prontosoft'
+      ? { ...item, checked: trimmed.length > 0 }
+      : item
+  )
+
+  const next: Order = {
+    ...order,
+    prontosoftOrderNumber: value,
+    stages: {
+      ...order.stages,
+      1: { ...stage, checklist: nextChecklist },
+    },
+  }
+
+  if (trimmed === previous) return next
+
+  const event = createHistoryEvent({
+    orderId: order.id,
+    type: 'field_updated',
+    stageId: 1,
+    stageLabel: getStageTitle(1),
+    occurredAt: new Date().toISOString(),
+    responsible: operatorId,
+    message: trimmed
+      ? `${operatorId} vinculou o pedido Prontosoft ${trimmed} ao cliente ${order.client}.`
+      : `${operatorId} removeu o vínculo Prontosoft do pedido.`,
     notes: '',
   })
 

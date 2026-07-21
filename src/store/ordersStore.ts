@@ -10,6 +10,7 @@ import {
   getOrderStatus as computeOrderStatus,
   toggleChecklistItem,
   updateOrderShippingFields,
+  updateProntosoftOrderNumber,
   updateStageObservations,
 } from '@/services/workflowService'
 import { canUserWorkOnStage, isAdminUser } from '@/constants/users'
@@ -115,6 +116,11 @@ type OrdersState = {
     trackingCode?: string
     imeis?: string
     tags?: string
+  }) => { ok: boolean; error?: string }
+
+  updateProntosoftNumber: (input: {
+    orderId: string
+    value: string
   }) => { ok: boolean; error?: string }
 
   tryCompleteCurrentStage: (input: {
@@ -335,6 +341,43 @@ export const useOrdersStore = create<OrdersState>()(
         }
       },
 
+      updateProntosoftNumber: ({ orderId, value }) => {
+        const user = getSessionUser()
+        if (!user) return { ok: false, error: 'Sessão expirada.' }
+
+        const state = get()
+        const idx = state.orders.findIndex((o) => o.id === orderId)
+        if (idx === -1) return { ok: false, error: 'Pedido não encontrado.' }
+
+        const order = state.orders[idx]
+        if (!canUserWorkOnStage(user, 1)) {
+          return {
+            ok: false,
+            error: 'Você não tem permissão para atuar neste processo.',
+          }
+        }
+
+        try {
+          const nextOrder = updateProntosoftOrderNumber({
+            order,
+            value,
+            operatorId: user.name,
+          })
+          const orders = [...state.orders]
+          orders[idx] = nextOrder
+          set({ orders })
+          return { ok: true }
+        } catch (e) {
+          return {
+            ok: false,
+            error:
+              e instanceof Error
+                ? e.message
+                : 'Erro ao vincular número Prontosoft.',
+          }
+        }
+      },
+
       tryCompleteCurrentStage: ({ orderId, notes }) => {
         const user = getSessionUser()
         if (!user) return { ok: false, error: 'Sessão expirada.' }
@@ -356,9 +399,11 @@ export const useOrdersStore = create<OrdersState>()(
           return {
             ok: false,
             error:
-              order.currentStageId === 2 && !order.trackingCode.trim()
-                ? 'Informe o código de rastreio.'
-                : 'Checklist obrigatório incompleto.',
+              order.currentStageId === 1 && !order.prontosoftOrderNumber.trim()
+                ? 'Informe o número do pedido na Prontosoft no checklist.'
+                : order.currentStageId === 2 && !order.trackingCode.trim()
+                  ? 'Informe o código de rastreio.'
+                  : 'Checklist obrigatório incompleto.',
           }
         }
 

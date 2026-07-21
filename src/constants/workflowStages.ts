@@ -29,7 +29,11 @@ export const WORKFLOW_STAGES: Record<
           'Ligar para o cliente informando: pedido recebido, prazo de até 48h úteis para envio e que o código de rastreio será enviado após a postagem',
         required: true,
       },
-      { id: 'prontosoft', label: 'Cadastrar o pedido na Prontosoft', required: true },
+      {
+        id: 'prontosoft',
+        label: 'Cadastrar o pedido na Prontosoft',
+        required: true,
+      },
       { id: 'conferir', label: 'Conferir informações', required: true },
     ],
   },

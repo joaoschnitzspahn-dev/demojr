@@ -68,6 +68,11 @@ export function createOrder({
     ...stages[startStageId]!,
     startedAt: iso,
     responsible: operatorId,
+    checklist: stages[startStageId]!.checklist.map((item) =>
+      item.id === 'prontosoft' && prontosoftOrderNumber.trim()
+        ? { ...item, checked: true }
+        : item
+    ),
   }
 
   const order: Order = {

@@ -38,6 +38,7 @@ export default function OrderDrawer() {
     (s) => s.updateStageObservations
   )
   const updateShippingFields = useOrdersStore((s) => s.updateShippingFields)
+  const updateProntosoftNumber = useOrdersStore((s) => s.updateProntosoftNumber)
   const tryCompleteCurrentStage = useOrdersStore(
     (s) => s.tryCompleteCurrentStage
   )
@@ -335,6 +336,16 @@ export default function OrderDrawer() {
                       <StageChecklist
                         items={stageProgress.checklist}
                         disabled={checklistDisabled}
+                        prontosoftOrderNumber={order.prontosoftOrderNumber}
+                        onProntosoftChange={(value) => {
+                          const result = updateProntosoftNumber({
+                            orderId: order.id,
+                            value,
+                          })
+                          if (!result.ok && result.error) {
+                            toast.error('Ação bloqueada', result.error)
+                          }
+                        }}
                         onToggle={(itemId, checked) => {
                           const result = toggleChecklistItem({
                             orderId: order.id,
