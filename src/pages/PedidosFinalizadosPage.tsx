@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useOrdersStore } from '@/store/ordersStore'
 import { useAuthStore } from '@/store/authStore'
+import { isAdminUser } from '@/constants/users'
 import { useInitializeOrders } from '@/hooks/useInitializeOrders'
 import { PRODUCT_LABELS } from '@/constants/products'
 import { formatDate } from '@/utils/date'
@@ -46,7 +47,7 @@ export default function PedidosFinalizadosPage() {
   const deleteFinishedOrder = useOrdersStore((s) => s.deleteFinishedOrder)
   const syncFinishedFromServer = useOrdersStore((s) => s.syncFinishedFromServer)
   const currentUser = useAuthStore((s) => s.currentUser)
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = isAdminUser(currentUser)
 
   const [query, setQuery] = React.useState('')
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
@@ -87,6 +88,11 @@ export default function PedidosFinalizadosPage() {
 
     if (!result.ok) {
       toast.error('Não foi possível excluir', result.error)
+      return
+    }
+
+    if (result.warning) {
+      toast.info('Pedido removido', result.warning)
       return
     }
 

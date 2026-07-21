@@ -108,8 +108,21 @@ export async function deleteFinishedOrderApi(
 
     return { ok: true }
   } catch {
-    return { ok: false, error: 'Não foi possível excluir no servidor.' }
+    return { ok: false, error: 'Servidor indisponível.' }
   }
+}
+
+/** Erros em que a exclusão local ainda pode prosseguir. */
+export function isDeleteServerOptionalError(error: string): boolean {
+  const lower = error.toLowerCase()
+  return (
+    lower.includes('indisponível') ||
+    lower.includes('servidor') ||
+    lower.includes('não encontrado') ||
+    lower.includes('404') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('network')
+  )
 }
 
 export async function checkApiHealth(): Promise<boolean> {

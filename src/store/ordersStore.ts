@@ -12,11 +12,12 @@ import {
   updateOrderShippingFields,
   updateStageObservations,
 } from '@/services/workflowService'
-import { canUserWorkOnStage } from '@/constants/users'
+import { canUserWorkOnStage, isAdminUser } from '@/constants/users'
 import { useAuthStore } from '@/store/authStore'
 import {
   deleteFinishedOrderApi,
   fetchFinishedOrders,
+  isDeleteServerOptionalError,
   saveFinishedOrder,
   syncFinishedOrders,
 } from '@/services/finishedOrdersApi'
@@ -37,13 +38,24 @@ function refreshOrders(orders: Order[]): Order[] {
   )
 }
 
-function mergeFinishedOrders(localOrders: Order[], serverOrders: Order[]): Order[] {
-  const serverById = new Map(serverOrders.map((o) => [o.id, o]))
+function mergeFinishedOrders(
+  localOrders: Order[],
+  serverOrders: Order[],
+  deletedIds: string[] = []
+): Order[] {
+  const deleted = new Set(deletedIds)
+  const serverById = new Map(
+    serverOrders.filter((o) => !deleted.has(o.id)).map((o) => [o.id, o])
+  )
   const activeOrders = localOrders.filter((o) => !o.completedAt)
   const mergedFinished = [...serverById.values()]
 
   for (const order of localOrders) {
-    if (order.completedAt && !serverById.has(order.id)) {
+    if (
+      order.completedAt &&
+      !serverById.has(order.id) &&
+      !deleted.has(order.id)
+    ) {
       mergedFinished.push(order)
     }
   }
@@ -59,6 +71,7 @@ function mergeFinishedOrders(localOrders: Order[], serverOrders: Order[]): Order
 
 type OrdersState = {
   orders: Order[]
+  deletedFinishedOrderIds: string[]
   loading: boolean
   seeded: boolean
   syncingFinished: boolean
@@ -107,7 +120,9 @@ type OrdersState = {
     notes: string
   }) => { ok: boolean; error?: string }
 
-  deleteFinishedOrder: (orderId: string) => Promise<{ ok: boolean; error?: string }>
+  deleteFinishedOrder: (
+    orderId: string
+  ) => Promise<{ ok: boolean; error?: string; warning?: string }>
 
   getOrderById: (id: string) => Order | undefined
   getOrderStatus: (order: Order) => ReturnType<typeof computeOrderStatus>
@@ -119,6 +134,7 @@ export const useOrdersStore = create<OrdersState>()(
   persist(
     (set, get) => ({
       orders: [],
+      deletedFinishedOrderIds: [],
       loading: false,
       seeded: false,
       syncingFinished: false,
@@ -146,12 +162,19 @@ export const useOrdersStore = create<OrdersState>()(
         set({ syncingFinished: true })
 
         const state = get()
-        const localFinished = state.orders.filter((o) => Boolean(o.completedAt))
+        const deletedIds = state.deletedFinishedOrderIds ?? []
+        const localFinished = state.orders.filter(
+          (o) => Boolean(o.completedAt) && !deletedIds.includes(o.id)
+        )
 
         const syncResult = await syncFinishedOrders(localFinished)
         if (syncResult.ok && syncResult.data) {
           set((s) => ({
-            orders: mergeFinishedOrders(s.orders, syncResult.data!),
+            orders: mergeFinishedOrders(
+              s.orders,
+              syncResult.data!,
+              s.deletedFinishedOrderIds ?? []
+            ),
             serverOnline: true,
             syncingFinished: false,
           }))
@@ -161,7 +184,11 @@ export const useOrdersStore = create<OrdersState>()(
         const fetchResult = await fetchFinishedOrders()
         if (fetchResult.ok && fetchResult.data) {
           set((s) => ({
-            orders: mergeFinishedOrders(s.orders, fetchResult.data!),
+            orders: mergeFinishedOrders(
+              s.orders,
+              fetchResult.data!,
+              s.deletedFinishedOrderIds ?? []
+            ),
             serverOnline: true,
             syncingFinished: false,
           }))
@@ -354,31 +381,50 @@ export const useOrdersStore = create<OrdersState>()(
 
       deleteFinishedOrder: async (orderId) => {
         const user = getSessionUser()
-        if (!user || user.role !== 'admin') {
+        if (!user || !isAdminUser(user)) {
           return { ok: false, error: 'Apenas o administrador pode excluir.' }
         }
 
         const order = get().orders.find((o) => o.id === orderId)
         if (!order?.completedAt) {
-          return { ok: false, error: 'Somente pedidos finalizados podem ser excluídos.' }
+          return {
+            ok: false,
+            error: 'Somente pedidos finalizados podem ser excluídos.',
+          }
         }
+
+        const adminRecord =
+          useAuthStore.getState().users.find((u) => isAdminUser(u)) ?? user
 
         const apiResult = await deleteFinishedOrderApi(
           orderId,
-          user.login,
-          user.password
+          adminRecord.login,
+          adminRecord.password
         )
 
-        if (!apiResult.ok) {
+        if (!apiResult.ok && !isDeleteServerOptionalError(apiResult.error)) {
           return apiResult
         }
 
         set((s) => ({
           orders: s.orders.filter((o) => o.id !== orderId),
+          deletedFinishedOrderIds: (s.deletedFinishedOrderIds ?? []).includes(
+            orderId
+          )
+            ? s.deletedFinishedOrderIds ?? []
+            : [...(s.deletedFinishedOrderIds ?? []), orderId],
           selectedOrderId:
             s.selectedOrderId === orderId ? null : s.selectedOrderId,
           drawerOpen: s.selectedOrderId === orderId ? false : s.drawerOpen,
         }))
+
+        if (!apiResult.ok) {
+          return {
+            ok: true,
+            warning:
+              'Removido da lista local. Inicie o servidor (npm run server) para excluir do banco central.',
+          }
+        }
 
         return { ok: true }
       },
@@ -395,6 +441,7 @@ export const useOrdersStore = create<OrdersState>()(
       partialize: (state) => ({
         orders: state.orders,
         seeded: state.seeded,
+        deletedFinishedOrderIds: state.deletedFinishedOrderIds,
       }),
     }
   )
