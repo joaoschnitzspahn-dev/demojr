@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/utils/cn'
 import { Toaster } from '@/components/ui/toast'
 import OrderDrawer from '@/components/orders/OrderDrawer'
+import { useAutoSyncOrders } from '@/hooks/useAutoSyncOrders'
 import { useAuthStore } from '@/store/authStore'
 import { isAdminUser } from '@/constants/users'
 
@@ -13,6 +14,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const currentUser = useAuthStore((s) => s.currentUser)
   const logout = useAuthStore((s) => s.logout)
   const isAdmin = isAdminUser(currentUser)
+
+  useAutoSyncOrders()
 
   function handleLogout() {
     logout()

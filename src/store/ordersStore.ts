@@ -76,12 +76,14 @@ type OrdersState = {
   seeded: boolean
   syncingFinished: boolean
   serverOnline: boolean | null
+  lastAutoSyncAt: string | null
 
   selectedOrderId: string | null
   drawerOpen: boolean
 
   initialize: () => Promise<void>
   syncFinishedFromServer: () => Promise<{ ok: boolean; error?: string }>
+  autoSync: () => Promise<{ ok: boolean; error?: string }>
   selectOrder: (id: string) => void
   closeDrawer: () => void
 
@@ -139,6 +141,7 @@ export const useOrdersStore = create<OrdersState>()(
       seeded: false,
       syncingFinished: false,
       serverOnline: null,
+      lastAutoSyncAt: null,
 
       selectedOrderId: null,
       drawerOpen: false,
@@ -177,6 +180,7 @@ export const useOrdersStore = create<OrdersState>()(
             ),
             serverOnline: true,
             syncingFinished: false,
+            lastAutoSyncAt: new Date().toISOString(),
           }))
           return { ok: true }
         }
@@ -191,6 +195,7 @@ export const useOrdersStore = create<OrdersState>()(
             ),
             serverOnline: true,
             syncingFinished: false,
+            lastAutoSyncAt: new Date().toISOString(),
           }))
           return { ok: true }
         }
@@ -203,6 +208,11 @@ export const useOrdersStore = create<OrdersState>()(
               ? fetchResult.error
               : 'Erro ao sincronizar.'
         return { ok: false, error: errorMessage }
+      },
+
+      autoSync: async () => {
+        set((s) => ({ orders: refreshOrders(s.orders) }))
+        return get().syncFinishedFromServer()
       },
 
       selectOrder: (id) => {
@@ -442,6 +452,7 @@ export const useOrdersStore = create<OrdersState>()(
         orders: state.orders,
         seeded: state.seeded,
         deletedFinishedOrderIds: state.deletedFinishedOrderIds,
+        lastAutoSyncAt: state.lastAutoSyncAt,
       }),
     }
   )
