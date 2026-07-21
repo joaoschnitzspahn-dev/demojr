@@ -10,7 +10,6 @@ import { useOrdersStore } from '@/store/ordersStore'
 import { toast } from '@/components/ui/toast'
 import { useAuthStore } from '@/store/authStore'
 import { PRODUCT_OPTIONS } from '@/constants/products'
-import ProntosoftConsole from '@/components/orders/ProntosoftConsole'
 import type { ProductType } from '@/types/workflow'
 
 const schema = z.object({
@@ -35,7 +34,6 @@ export default function CadastroPedidoPage() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -151,11 +149,26 @@ export default function CadastroPedidoPage() {
               ) : null}
             </div>
 
-            <ProntosoftConsole
-              field={register('prontosoftOrderNumber')}
-              value={watch('prontosoftOrderNumber') ?? ''}
-              error={errors.prontosoftOrderNumber}
-            />
+            <div>
+              <label className="text-xs font-medium text-[var(--text-h)]">
+                Nº pedido Prontosoft
+              </label>
+              <Input
+                className="mt-1.5"
+                placeholder="PS-2026-00000"
+                autoComplete="off"
+                {...register('prontosoftOrderNumber')}
+              />
+              {errors.prontosoftOrderNumber ? (
+                <p className="mt-1.5 text-xs text-[var(--danger)]">
+                  {errors.prontosoftOrderNumber.message}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                  Opcional agora · obrigatório antes de concluir Cadastro
+                </p>
+              )}
+            </div>
 
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">

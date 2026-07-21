@@ -177,11 +177,13 @@ export default function OrderDrawer() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100">
+                  <div className="text-sm font-medium text-[var(--text-h)]">
                     {order.prontosoftOrderNumber?.trim() ? (
                       order.prontosoftOrderNumber
                     ) : (
-                      <span className="text-zinc-500">Não informado</span>
+                      <span className="font-normal text-[var(--text-muted)]">
+                        Não informado
+                      </span>
                     )}
                   </div>
                 </CardContent>
