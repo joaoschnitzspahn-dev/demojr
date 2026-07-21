@@ -10,6 +10,7 @@ import { useOrdersStore } from '@/store/ordersStore'
 import { toast } from '@/components/ui/toast'
 import { useAuthStore } from '@/store/authStore'
 import { PRODUCT_OPTIONS } from '@/constants/products'
+import ProntosoftConsole from '@/components/orders/ProntosoftConsole'
 import type { ProductType } from '@/types/workflow'
 
 const schema = z.object({
@@ -34,6 +35,7 @@ export default function CadastroPedidoPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -149,32 +151,11 @@ export default function CadastroPedidoPage() {
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-inner">
-              <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="font-mono text-[11px] font-medium text-zinc-400">
-                  Prontosoft · console
-                </span>
-              </div>
-              <div className="space-y-1 p-4 font-mono text-sm">
-                <p className="text-[11px] text-zinc-500">
-                  Nº do pedido Prontosoft
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="select-none text-emerald-500">{'>'}</span>
-                  <input
-                    type="text"
-                    placeholder="Ex.: PS-2024-00842"
-                    className="w-full bg-transparent text-zinc-100 placeholder:text-zinc-600 outline-none"
-                    {...register('prontosoftOrderNumber')}
-                  />
-                </div>
-                <p className="pt-1 text-[10px] leading-relaxed text-zinc-600">
-                  Informe o número gerado na Prontosoft após o cadastro. Pode
-                  preencher depois, antes de concluir a etapa de Cadastro.
-                </p>
-              </div>
-            </div>
+            <ProntosoftConsole
+              field={register('prontosoftOrderNumber')}
+              value={watch('prontosoftOrderNumber') ?? ''}
+              error={errors.prontosoftOrderNumber}
+            />
 
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
