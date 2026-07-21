@@ -173,6 +173,22 @@ export default function OrderDrawer() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-xs text-[var(--text-muted)]">
+                    Prontosoft
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100">
+                    {order.prontosoftOrderNumber?.trim() ? (
+                      order.prontosoftOrderNumber
+                    ) : (
+                      <span className="text-zinc-500">Não informado</span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xs text-[var(--text-muted)]">
                     Processo atual
                   </CardTitle>
                 </CardHeader>

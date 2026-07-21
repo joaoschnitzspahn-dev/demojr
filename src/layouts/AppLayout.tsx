@@ -5,13 +5,14 @@ import { cn } from '@/utils/cn'
 import { Toaster } from '@/components/ui/toast'
 import OrderDrawer from '@/components/orders/OrderDrawer'
 import { useAuthStore } from '@/store/authStore'
+import { isAdminUser } from '@/constants/users'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.currentUser)
   const logout = useAuthStore((s) => s.logout)
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = isAdminUser(currentUser)
 
   function handleLogout() {
     logout()
@@ -38,46 +39,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
 
             <nav className="hidden items-center gap-0.5 sm:flex">
-              <Link to="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    location.pathname === '/' &&
-                      'bg-[var(--bg-muted)] text-[var(--text-h)]'
-                  )}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                  Pedidos
-                </Button>
-              </Link>
-              <Link to="/finalizados">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    location.pathname === '/finalizados' &&
-                      'bg-[var(--bg-muted)] text-[var(--text-h)]'
-                  )}
-                >
-                  <Archive className="h-3.5 w-3.5" />
-                  Finalizados
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className={cn(
+                  location.pathname === '/' &&
+                    'bg-[var(--bg-muted)] text-[var(--text-h)]'
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Pedidos
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/finalizados')}
+                className={cn(
+                  location.pathname === '/finalizados' &&
+                    'bg-[var(--bg-muted)] text-[var(--text-h)]'
+                )}
+              >
+                <Archive className="h-3.5 w-3.5" />
+                Finalizados
+              </Button>
               {isAdmin ? (
-                <Link to="/usuarios">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      location.pathname === '/usuarios' &&
-                        'bg-[var(--bg-muted)] text-[var(--text-h)]'
-                    )}
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    Usuários
-                  </Button>
-                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/usuarios')}
+                  className={cn(
+                    location.pathname === '/usuarios' &&
+                      'bg-[var(--bg-muted)] text-[var(--text-h)]'
+                  )}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Usuários
+                </Button>
               ) : null}
             </nav>
           </div>

@@ -130,6 +130,7 @@ export function seedMockOrders() {
     phone: string
     product: ProductType
     observations: string
+    prontosoftOrderNumber?: string
     trackingCode?: string
     imeis?: string
     tags?: string
@@ -147,6 +148,7 @@ export function seedMockOrders() {
       phone: '(11) 98888-1001',
       product: 'mini_rastreador',
       observations: 'Cliente pediu prioridade se possível',
+      prontosoftOrderNumber: 'PS-2026-00001',
       createdAt: isoDaysAgo(0.1),
       currentStageId: 1,
       stages: {
@@ -161,6 +163,7 @@ export function seedMockOrders() {
       phone: '(21) 97777-2002',
       product: 'lv12_4g',
       observations: 'Sem observações adicionais',
+      prontosoftOrderNumber: 'PS-2026-00002',
       createdAt: isoDaysAgo(0.2),
       currentStageId: 2,
       stages: {
@@ -180,6 +183,7 @@ export function seedMockOrders() {
       phone: '(31) 96666-3003',
       product: 'mini_rastreador',
       observations: 'Conferir IMEIs com atenção',
+      prontosoftOrderNumber: 'PS-2026-00003',
       trackingCode: 'BR123456789ON',
       imeis: '356938035643809',
       tags: 'TAG-1001',
@@ -317,6 +321,7 @@ export function seedMockOrders() {
       phone: b.phone,
       product: b.product,
       observations: b.observations,
+      prontosoftOrderNumber: b.prontosoftOrderNumber ?? '',
       operatorId: op,
     })
 

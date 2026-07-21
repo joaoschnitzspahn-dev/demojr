@@ -36,6 +36,7 @@ export type CreateOrderInput = {
   phone: string
   product: ProductType
   observations: string
+  prontosoftOrderNumber?: string
   operatorId?: OperatorId
 }
 
@@ -47,6 +48,7 @@ export function createOrder({
   phone,
   product,
   observations,
+  prontosoftOrderNumber = '',
   operatorId = OPERADOR_FICTICIO,
 }: CreateOrderInput): Order {
   const iso = new Date().toISOString()
@@ -77,6 +79,7 @@ export function createOrder({
     phone,
     product,
     observations,
+    prontosoftOrderNumber: prontosoftOrderNumber.trim(),
     trackingCode: '',
     imeis: '',
     tags: '',

@@ -14,6 +14,12 @@ import {
 } from '@/services/workflowService'
 import { canUserWorkOnStage } from '@/constants/users'
 import { useAuthStore } from '@/store/authStore'
+import {
+  deleteFinishedOrderApi,
+  fetchFinishedOrders,
+  saveFinishedOrder,
+  syncFinishedOrders,
+} from '@/services/finishedOrdersApi'
 import type { Order, ProductType, WorkflowStageId } from '@/types/workflow'
 
 function getSessionUser() {
@@ -22,19 +28,47 @@ function getSessionUser() {
 
 function refreshOrders(orders: Order[]): Order[] {
   return orders.map((o) =>
-    activateRenovacaoIfDue(ensureReminderStatuses(o))
+    activateRenovacaoIfDue(
+      ensureReminderStatuses({
+        ...o,
+        prontosoftOrderNumber: o.prontosoftOrderNumber ?? '',
+      })
+    )
   )
+}
+
+function mergeFinishedOrders(localOrders: Order[], serverOrders: Order[]): Order[] {
+  const serverById = new Map(serverOrders.map((o) => [o.id, o]))
+  const activeOrders = localOrders.filter((o) => !o.completedAt)
+  const mergedFinished = [...serverById.values()]
+
+  for (const order of localOrders) {
+    if (order.completedAt && !serverById.has(order.id)) {
+      mergedFinished.push(order)
+    }
+  }
+
+  mergedFinished.sort(
+    (a, b) =>
+      new Date(b.completedAt ?? 0).getTime() -
+      new Date(a.completedAt ?? 0).getTime()
+  )
+
+  return [...activeOrders, ...mergedFinished]
 }
 
 type OrdersState = {
   orders: Order[]
   loading: boolean
   seeded: boolean
+  syncingFinished: boolean
+  serverOnline: boolean | null
 
   selectedOrderId: string | null
   drawerOpen: boolean
 
-  initialize: () => void
+  initialize: () => Promise<void>
+  syncFinishedFromServer: () => Promise<{ ok: boolean; error?: string }>
   selectOrder: (id: string) => void
   closeDrawer: () => void
 
@@ -45,6 +79,7 @@ type OrdersState = {
     phone: string
     product: ProductType
     observations: string
+    prontosoftOrderNumber: string
   }) => void
 
   toggleChecklistItem: (input: {
@@ -72,6 +107,8 @@ type OrdersState = {
     notes: string
   }) => { ok: boolean; error?: string }
 
+  deleteFinishedOrder: (orderId: string) => Promise<{ ok: boolean; error?: string }>
+
   getOrderById: (id: string) => Order | undefined
   getOrderStatus: (order: Order) => ReturnType<typeof computeOrderStatus>
   getActiveOrders: () => Order[]
@@ -84,20 +121,61 @@ export const useOrdersStore = create<OrdersState>()(
       orders: [],
       loading: false,
       seeded: false,
+      syncingFinished: false,
+      serverOnline: null,
 
       selectedOrderId: null,
       drawerOpen: false,
 
-      initialize: () => {
+      initialize: async () => {
         if (get().seeded) {
           set((s) => ({ orders: refreshOrders(s.orders) }))
+          await get().syncFinishedFromServer()
           return
         }
+
         set({ loading: true })
-        window.setTimeout(() => {
-          const orders = refreshOrders(seedMockOrders())
-          set({ orders, loading: false, seeded: true })
-        }, 650)
+        await new Promise((r) => window.setTimeout(r, 650))
+
+        const orders = refreshOrders(seedMockOrders())
+        set({ orders, loading: false, seeded: true })
+        await get().syncFinishedFromServer()
+      },
+
+      syncFinishedFromServer: async () => {
+        set({ syncingFinished: true })
+
+        const state = get()
+        const localFinished = state.orders.filter((o) => Boolean(o.completedAt))
+
+        const syncResult = await syncFinishedOrders(localFinished)
+        if (syncResult.ok && syncResult.data) {
+          set((s) => ({
+            orders: mergeFinishedOrders(s.orders, syncResult.data!),
+            serverOnline: true,
+            syncingFinished: false,
+          }))
+          return { ok: true }
+        }
+
+        const fetchResult = await fetchFinishedOrders()
+        if (fetchResult.ok && fetchResult.data) {
+          set((s) => ({
+            orders: mergeFinishedOrders(s.orders, fetchResult.data!),
+            serverOnline: true,
+            syncingFinished: false,
+          }))
+          return { ok: true }
+        }
+
+        set({ serverOnline: false, syncingFinished: false })
+        const errorMessage =
+          !syncResult.ok
+            ? syncResult.error
+            : !fetchResult.ok
+              ? fetchResult.error
+              : 'Erro ao sincronizar.'
+        return { ok: false, error: errorMessage }
       },
 
       selectOrder: (id) => {
@@ -125,6 +203,7 @@ export const useOrdersStore = create<OrdersState>()(
           phone: input.phone,
           product: input.product,
           observations: input.observations,
+          prontosoftOrderNumber: input.prontosoftOrderNumber,
           operatorId: user.name,
         })
 
@@ -255,6 +334,15 @@ export const useOrdersStore = create<OrdersState>()(
           const orders = [...state.orders]
           orders[idx] = updatedOrder
           set({ orders })
+
+          if (updatedOrder.completedAt) {
+            void saveFinishedOrder(updatedOrder).then((result) => {
+              if (result.ok) {
+                set({ serverOnline: true })
+              }
+            })
+          }
+
           return { ok: true }
         } catch (e) {
           return {
@@ -262,6 +350,37 @@ export const useOrdersStore = create<OrdersState>()(
             error: e instanceof Error ? e.message : 'Erro ao concluir processo.',
           }
         }
+      },
+
+      deleteFinishedOrder: async (orderId) => {
+        const user = getSessionUser()
+        if (!user || user.role !== 'admin') {
+          return { ok: false, error: 'Apenas o administrador pode excluir.' }
+        }
+
+        const order = get().orders.find((o) => o.id === orderId)
+        if (!order?.completedAt) {
+          return { ok: false, error: 'Somente pedidos finalizados podem ser excluídos.' }
+        }
+
+        const apiResult = await deleteFinishedOrderApi(
+          orderId,
+          user.login,
+          user.password
+        )
+
+        if (!apiResult.ok) {
+          return apiResult
+        }
+
+        set((s) => ({
+          orders: s.orders.filter((o) => o.id !== orderId),
+          selectedOrderId:
+            s.selectedOrderId === orderId ? null : s.selectedOrderId,
+          drawerOpen: s.selectedOrderId === orderId ? false : s.drawerOpen,
+        }))
+
+        return { ok: true }
       },
 
       getOrderById: (id) => get().orders.find((o) => o.id === id),

@@ -15,6 +15,7 @@ export type IntegrationStatus = 'planned' | 'ready' | 'active'
 
 export const INTEGRATIONS_ROADMAP = [
   'auth_permissions',
+  'finished_orders_db',
   'postgresql',
   'rest_api',
   'prontosoft',

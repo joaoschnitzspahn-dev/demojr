@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { DEFAULT_ADMIN, SEED_USERS } from '@/constants/users'
+import { DEFAULT_ADMIN, isAdminUser, normalizeAppUser, SEED_USERS } from '@/constants/users'
 import type { AppUser, WorkflowStageId } from '@/types/workflow'
 
 type AuthState = {
@@ -48,7 +48,7 @@ export const useAuthStore = create<AuthState>()(
           return { ok: false, error: 'Usuário desativado. Contate o administrador.' }
         }
 
-        set({ currentUser: user })
+        set({ currentUser: normalizeAppUser(user) })
         return { ok: true }
       },
 
@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState>()(
 
       createUser: ({ login, password, name, assignedStages }) => {
         const current = get().currentUser
-        if (!current || current.role !== 'admin') {
+        if (!current || !isAdminUser(current)) {
           return { ok: false, error: 'Apenas o administrador pode criar usuários.' }
         }
 
@@ -93,7 +93,7 @@ export const useAuthStore = create<AuthState>()(
 
       updateUserStages: (userId, assignedStages) => {
         const current = get().currentUser
-        if (!current || current.role !== 'admin') {
+        if (!current || !isAdminUser(current)) {
           return { ok: false, error: 'Sem permissão.' }
         }
         if (assignedStages.length === 0) {
@@ -115,7 +115,7 @@ export const useAuthStore = create<AuthState>()(
 
       toggleUserActive: (userId) => {
         const current = get().currentUser
-        if (!current || current.role !== 'admin') return
+        if (!current || !isAdminUser(current)) return
         if (userId === DEFAULT_ADMIN.id) return
 
         set((s) => ({
@@ -135,13 +135,22 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Garante que o admin master sempre exista
+          state.users = state.users.map(normalizeAppUser)
+
           const hasAdmin = state.users.some(
-            (u) => u.role === 'admin' && u.login === DEFAULT_ADMIN.login
+            (u) => isAdminUser(u) && u.login === DEFAULT_ADMIN.login
           )
           if (!hasAdmin) {
             state.users = [DEFAULT_ADMIN, ...state.users]
           }
+
+          if (state.currentUser) {
+            const freshUser = state.users.find(
+              (u) => u.id === state.currentUser!.id
+            )
+            state.currentUser = normalizeAppUser(freshUser ?? state.currentUser)
+          }
+
           state.hydrated = true
         }
       },

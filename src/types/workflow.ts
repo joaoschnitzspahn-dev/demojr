@@ -82,6 +82,9 @@ export type Order = {
   createdAt: string
   observations: string
 
+  /** Número do pedido no sistema Prontosoft. */
+  prontosoftOrderNumber: string
+
   /** Código de rastreio (preenchido na Expedição). */
   trackingCode: string
   /** IMEIs informados na Expedição — preparado para importação Excel. */

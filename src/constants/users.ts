@@ -22,11 +22,40 @@ export const SEED_USERS: AppUser[] = [DEFAULT_ADMIN]
 /** Nome padrão para seeds/mocks. */
 export const OPERADOR_FICTICIO = DEFAULT_ADMIN.name
 
+export function isAdminUser(user: AppUser | null | undefined): boolean {
+  if (!user) return false
+  if (user.role === 'admin') return true
+  return user.login.toLowerCase() === ADMIN_LOGIN.toLowerCase()
+}
+
+export function normalizeAppUser(user: AppUser): AppUser {
+  const validStages = ALL_STAGES
+  const assignedStages = (user.assignedStages ?? []).filter((s) =>
+    validStages.includes(s)
+  )
+
+  if (user.login.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
+    return {
+      ...DEFAULT_ADMIN,
+      ...user,
+      role: 'admin',
+      assignedStages: ALL_STAGES,
+      active: user.active ?? true,
+    }
+  }
+
+  return {
+    ...user,
+    assignedStages,
+    role: user.role === 'admin' ? 'admin' : 'operator',
+  }
+}
+
 export function canUserWorkOnStage(
   user: AppUser | null | undefined,
   stageId: WorkflowStageId
 ): boolean {
   if (!user || !user.active) return false
-  if (user.role === 'admin') return true
+  if (isAdminUser(user)) return true
   return user.assignedStages.includes(stageId)
 }

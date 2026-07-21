@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/authStore'
-import { WORKFLOW_STAGE_ORDER, WORKFLOW_STAGES } from '@/constants/workflowStages'
+import { WORKFLOW_STAGE_ORDER, WORKFLOW_STAGES, getStageTitle } from '@/constants/workflowStages'
 import type { WorkflowStageId } from '@/types/workflow'
 import { toast } from '@/components/ui/toast'
 import { formatDate } from '@/utils/date'
@@ -21,6 +21,14 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
+
+function stageLabel(stageId: WorkflowStageId) {
+  try {
+    return getStageTitle(stageId)
+  } catch {
+    return `Etapa ${stageId}`
+  }
+}
 
 export default function UsuariosAdminPage() {
   const users = useAuthStore((s) => s.users)
@@ -173,7 +181,7 @@ export default function UsuariosAdminPage() {
                         )}
                       >
                         <div className="font-medium">
-                          {stageId}. {WORKFLOW_STAGES[stageId].title}
+                          {stageId}. {stageLabel(stageId)}
                         </div>
                       </button>
                     )
@@ -222,9 +230,11 @@ export default function UsuariosAdminPage() {
                       Login: {user.login} · Criado em {formatDate(user.createdAt)}
                     </p>
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
-                      {user.assignedStages.map((sid) => (
+                      {user.assignedStages
+                        .filter((sid) => WORKFLOW_STAGES[sid])
+                        .map((sid) => (
                         <Badge key={sid} variant="accent">
-                          {sid}. {WORKFLOW_STAGES[sid].title}
+                          {sid}. {stageLabel(sid)}
                         </Badge>
                       ))}
                     </div>
@@ -279,7 +289,7 @@ export default function UsuariosAdminPage() {
                                 : 'border-[var(--border)] text-[var(--text)]'
                             )}
                           >
-                            {stageId}. {WORKFLOW_STAGES[stageId].title}
+                            {stageId}. {stageLabel(stageId)}
                           </button>
                         )
                       })}
