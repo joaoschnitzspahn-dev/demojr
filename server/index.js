@@ -3,7 +3,9 @@ import cors from 'cors'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { finishedOrdersRouter } from './routes/finishedOrders.js'
+import { usersRouter } from './routes/users.js'
 import { getDbPath } from './db.js'
+import { getUsersDbPath } from './usersDb.js'
 import { PORT } from './config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -19,11 +21,13 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     database: getDbPath(),
+    usersDatabase: getUsersDbPath(),
     mode: isProd ? 'production' : 'development',
   })
 })
 
 app.use('/api/finished-orders', finishedOrdersRouter)
+app.use('/api/users', usersRouter)
 
 if (isProd) {
   const distPath = path.join(rootDir, 'dist')

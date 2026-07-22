@@ -79,7 +79,10 @@ export default function UsuariosAdminPage() {
       return
     }
 
-    toast.success('Usuário criado', `${values.name} já pode acessar o sistema.`)
+    toast.success(
+      'Usuário criado',
+      `Login: ${values.login.trim().toLowerCase()} · Senha: a que você definiu`
+    )
     reset()
     setAssignedStages([])
     setShowForm(false)

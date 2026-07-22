@@ -11,6 +11,8 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
   const currentUser = useAuthStore((s) => s.currentUser)
+  const hydrated = useAuthStore((s) => s.hydrated)
+  const syncUsersFromServer = useAuthStore((s) => s.syncUsersFromServer)
 
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
@@ -18,13 +20,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    if (hydrated) {
+      void syncUsersFromServer()
+    }
+  }, [hydrated, syncUsersFromServer])
+
+  useEffect(() => {
     if (currentUser) navigate('/', { replace: true })
   }, [currentUser, navigate])
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    if (!hydrated) {
+      setLoading(false)
+      setError('Carregando sessão... tente novamente em 1 segundo.')
+      return
+    }
+
+    await syncUsersFromServer()
 
     window.setTimeout(() => {
       const result = login(loginValue, password)
@@ -37,7 +53,7 @@ export default function LoginPage() {
 
       toast.success('Sessão iniciada')
       navigate('/', { replace: true })
-    }, 250)
+    }, 150)
   }
 
   return (
@@ -71,6 +87,7 @@ export default function LoginPage() {
                     placeholder="Seu login"
                     autoComplete="username"
                     autoFocus
+                    disabled={!hydrated || loading}
                   />
                 </div>
               </div>
@@ -88,6 +105,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="current-password"
+                    disabled={!hydrated || loading}
                   />
                 </div>
               </div>
@@ -98,10 +116,16 @@ export default function LoginPage() {
                 </p>
               ) : null}
 
+              {!hydrated ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Carregando usuários...
+                </p>
+              ) : null}
+
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !loginValue || !password}
+                disabled={loading || !hydrated || !loginValue || !password}
               >
                 {loading ? 'Entrando...' : 'Entrar'}
               </Button>
