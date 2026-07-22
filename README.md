@@ -5,6 +5,7 @@ Workflow operacional de pedidos — React + API Node com banco central para pedi
 ## Login demo
 
 - **Admin:** `adm` / `adm123`
+- **Operador (todas as etapas):** `infra` / `infra123`
 
 ## Desenvolvimento local
 

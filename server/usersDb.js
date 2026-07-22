@@ -19,6 +19,19 @@ const DEFAULT_ADMIN = {
   createdAt: new Date(0).toISOString(),
 }
 
+const DEFAULT_OPERATOR = {
+  id: 'user-operator-infra',
+  login: 'infra',
+  password: 'infra123',
+  name: 'Infra',
+  role: 'operator',
+  assignedStages: [1, 2, 3, 4, 5, 6],
+  active: true,
+  createdAt: new Date(0).toISOString(),
+}
+
+const SEED_USERS = [DEFAULT_ADMIN, DEFAULT_OPERATOR]
+
 function ensureUsersDb() {
   const dir = path.dirname(USERS_DB_PATH)
   if (!fs.existsSync(dir)) {
@@ -27,7 +40,7 @@ function ensureUsersDb() {
   if (!fs.existsSync(USERS_DB_PATH)) {
     fs.writeFileSync(
       USERS_DB_PATH,
-      JSON.stringify({ users: [DEFAULT_ADMIN] }, null, 2),
+      JSON.stringify({ users: SEED_USERS }, null, 2),
       'utf8'
     )
   }
@@ -48,21 +61,45 @@ function writeUsersDb(data) {
   fs.writeFileSync(USERS_DB_PATH, JSON.stringify(data, null, 2), 'utf8')
 }
 
-function ensureAdmin(users) {
-  const hasAdmin = users.some(
+function ensureSeedUsers(users) {
+  let next = [...users]
+
+  const hasAdmin = next.some(
     (u) => u.role === 'admin' || String(u.login).toLowerCase() === 'adm'
   )
-  if (!hasAdmin) return [DEFAULT_ADMIN, ...users]
-  return users.map((u) =>
+  if (!hasAdmin) next = [DEFAULT_ADMIN, ...next]
+
+  next = next.map((u) =>
     String(u.login).toLowerCase() === 'adm'
       ? { ...DEFAULT_ADMIN, ...u, role: 'admin', login: 'adm' }
       : u
   )
+
+  const hasInfra = next.some((u) => String(u.login).toLowerCase() === 'infra')
+  if (!hasInfra) {
+    next = [...next, DEFAULT_OPERATOR]
+  } else {
+    next = next.map((u) =>
+      String(u.login).toLowerCase() === 'infra'
+        ? {
+            ...DEFAULT_OPERATOR,
+            ...u,
+            login: 'infra',
+            password: u.password || DEFAULT_OPERATOR.password,
+            role: 'operator',
+            assignedStages: [1, 2, 3, 4, 5, 6],
+            active: u.active !== false,
+          }
+        : u
+    )
+  }
+
+  return next
 }
 
 export function listUsers() {
   const db = readUsersDb()
-  return ensureAdmin(db.users)
+  return ensureSeedUsers(db.users)
 }
 
 export function syncUsers(users) {
@@ -70,7 +107,7 @@ export function syncUsers(users) {
     throw new Error('Lista de usuários inválida.')
   }
 
-  const cleaned = ensureAdmin(
+  const cleaned = ensureSeedUsers(
     users
       .filter((u) => u && u.id && u.login && u.password)
       .map((u) => ({
