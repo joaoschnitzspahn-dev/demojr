@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manual do Usuário — Sistema Infra</title>
+  <style>
+    :root {
+      --ink: #18181b;
+      --muted: #5c5c66;
+      --line: #e4e4e7;
+      --bg: #ffffff;
+      --soft: #f7f7f8;
+      --accent: #2563eb;
+      --ok: #059669;
+      --warn: #b45309;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.55;
+    }
+
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 28px 36px 48px;
+    }
+
+    .cover {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 42px 36px;
+      background: linear-gradient(180deg, #eff6ff 0%, #ffffff 55%);
+      margin-bottom: 28px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .brand-name {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 520px;
+    }
+
+    .meta {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .meta strong { color: var(--ink); }
+
+    h2 {
+      margin: 28px 0 10px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      margin: 18px 0 6px;
+      font-size: 12.5px;
+      color: var(--ink);
+      page-break-after: avoid;
+    }
+
+    p { margin: 0 0 10px; color: var(--muted); }
+    p strong, li strong { color: var(--ink); }
+
+    ul, ol {
+      margin: 0 0 12px;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    li { margin-bottom: 5px; }
+
+    .box {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 12px 0 16px;
+    }
+
+    .box.tip { border-color: #bfdbfe; background: #eff6ff; }
+    .box.warn { border-color: #fcd34d; background: #fffbeb; }
+    .box.ok { border-color: #a7f3d0; background: #ecfdf5; }
+
+    .box-title {
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--ink);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      font-size: 10.5pt;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 0 0 14px;
+    }
+
+    .steps li {
+      position: relative;
+      padding: 10px 12px 10px 46px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      background: #fff;
+      page-break-inside: avoid;
+    }
+
+    .steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 12px;
+      top: 10px;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 24px;
+      text-align: center;
+    }
+
+    .kbd {
+      display: inline-block;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 5px;
+      padding: 1px 6px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10pt;
+      color: var(--ink);
+    }
+
+    .footer {
+      margin-top: 34px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .page { padding: 0; max-width: none; }
+      .cover { break-inside: avoid; }
+      h2 { break-after: avoid; }
+      .steps li, .box, table { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="cover">
+      <div class="brand">
+        <div class="brand-mark">SI</div>
+        <div class="brand-name">Sistema Infra</div>
+      </div>
+      <h1>Manual do Usuário</h1>
+      <p class="subtitle">
+        Guia prático para operar o sistema de gestão de pedidos:
+        cadastro, expedição, entrega, pós-venda e acompanhamento.
+      </p>
+      <div class="meta">
+        <div><strong>Documento:</strong> Manual do Cliente</div>
+        <div><strong>Versão:</strong> 1.0</div>
+        <div><strong>Data:</strong> Julho/2026</div>
+        <div><strong>Público:</strong> Operadores e Administrador</div>
+      </div>
+    </section>
+
+    <h2>1. O que é o Sistema Infra</h2>
+    <p>
+      O <strong>Sistema Infra</strong> organiza o fluxo completo de um pedido,
+      da criação até o pós-venda. Cada pedido passa por etapas com checklist.
+      Só é possível avançar quando as tarefas obrigatórias da etapa atual
+      estão concluídas.
+    </p>
+
+    <div class="box tip">
+      <div class="box-title">Em resumo</div>
+      Você vê os pedidos no Kanban, abre o pedido, marca o checklist,
+      preenche os dados necessários e conclui a etapa para liberar a próxima.
+    </div>
+
+    <h2>2. Acessos e login</h2>
+    <p>Na tela inicial, informe login e senha e clique em <strong>Entrar</strong>.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Perfil</th>
+          <th>Login</th>
+          <th>Senha</th>
+          <th>O que pode fazer</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Administrador</strong></td>
+          <td><span class="kbd">adm</span></td>
+          <td><span class="kbd">adm123</span></td>
+          <td>Acesso total, criar usuários, excluir pedidos finalizados</td>
+        </tr>
+        <tr>
+          <td><strong>Operador</strong></td>
+          <td><span class="kbd">infra</span></td>
+          <td><span class="kbd">infra123</span></td>
+          <td>Executar todas as etapas do fluxo operacional</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="box warn">
+      <div class="box-title">Importante</div>
+      O login é sempre em <strong>minúsculas</strong>. Exemplo: se o usuário
+      for João, use <span class="kbd">joao</span>.
+      Para sair, clique no ícone de saída no canto superior direito.
+    </div>
+
+    <h2>3. Menu principal</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Menu</th>
+          <th>Para que serve</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Pedidos</strong></td>
+          <td>Dashboard e Kanban dos pedidos em andamento</td>
+        </tr>
+        <tr>
+          <td><strong>Finalizados</strong></td>
+          <td>Arquivo de pedidos já concluídos, com busca</td>
+        </tr>
+        <tr>
+          <td><strong>Usuários</strong></td>
+          <td>Somente admin: criar operadores e definir permissões</td>
+        </tr>
+        <tr>
+          <td><strong>Novo pedido</strong></td>
+          <td>Cadastrar um pedido novo</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. Como criar um novo pedido</h2>
+    <ol class="steps">
+      <li>Clique em <strong>Novo pedido</strong>.</li>
+      <li>
+        Preencha os dados do cliente:
+        <strong>nome, CPF, telefone, e-mail</strong>.
+      </li>
+      <li>
+        (Opcional) Informe o <strong>nº do pedido Prontosoft</strong>,
+        se já tiver. Também pode preencher depois no checklist.
+      </li>
+      <li>
+        Selecione o <strong>produto</strong>:
+        <ul>
+          <li><strong>Mini Rastreador</strong> — inclui renovação automática depois</li>
+          <li><strong>LV-12 4G</strong> — fluxo sem renovação</li>
+        </ul>
+      </li>
+      <li>Adicione observações, se necessário.</li>
+      <li>Clique em <strong>Salvar pedido</strong>.</li>
+    </ol>
+
+    <div class="box ok">
+      <div class="box-title">Resultado</div>
+      O sistema gera o número do pedido automaticamente (ex.: <span class="kbd">PED-0001</span>)
+      e inicia o fluxo na etapa <strong>Cadastro do Pedido</strong>.
+    </div>
+
+    <h2>5. Fluxo operacional (etapas)</h2>
+    <p>Todo pedido segue esta sequência:</p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Etapa</th>
+          <th>Objetivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Cadastro do Pedido</strong></td>
+          <td>Registrar, ligar para o cliente e vincular nº Prontosoft</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Expedição</strong></td>
+          <td>Preparar envio, informar IMEIs e código de rastreio</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Acompanhamento da Entrega</strong></td>
+          <td>Monitorar Ontime e informar o cliente</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Confirmação de Recebimento</strong></td>
+          <td>Confirmar entrega, liberar tag e enviar apps/tutoriais</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Pós-venda</strong></td>
+          <td>Contato de acompanhamento e finalização do pedido</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>Renovação</strong></td>
+          <td>Somente Mini Rastreador — agendada para 5 meses</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="box tip">
+      <div class="box-title">Regra principal</div>
+      Só existe <strong>1 etapa ativa</strong> por vez. Não é possível pular,
+      voltar ou editar etapas já concluídas.
+    </div>
+
+    <h2>6. Como trabalhar um pedido (Kanban + painel)</h2>
+    <ol class="steps">
+      <li>Na tela <strong>Pedidos</strong>, localize o card do pedido na coluna da etapa atual.</li>
+      <li>Clique no card para abrir o <strong>painel lateral</strong>.</li>
+      <li>Veja os dados do cliente, produto, Prontosoft, rastreio e histórico.</li>
+      <li>Marque os itens do <strong>checklist</strong> da etapa ativa.</li>
+      <li>Preencha campos obrigatórios da etapa (ex.: Prontosoft, IMEIs, rastreio).</li>
+      <li>Quando tudo estiver ok, clique em <strong>Concluir etapa</strong>.</li>
+      <li>O pedido avança automaticamente para a próxima coluna do Kanban.</li>
+    </ol>
+
+    <h3>6.1 Cadastro do Pedido — Prontosoft</h3>
+    <p>
+      No checklist <strong>“Cadastrar o pedido na Prontosoft”</strong>, digite o
+      número gerado na Prontosoft. O sistema:
+    </p>
+    <ul>
+      <li>vincula o número ao cliente/pedido automaticamente;</li>
+      <li>marca o item do checklist;</li>
+      <li>registra no histórico.</li>
+    </ul>
+    <p>Sem esse número, a etapa de Cadastro <strong>não pode ser concluída</strong>.</p>
+
+    <h3>6.2 Expedição — IMEIs e planilha</h3>
+    <p>Na etapa de Expedição, use a seção <strong>Dados de expedição</strong>:</p>
+    <ul>
+      <li><strong>Código de rastreio</strong> — obrigatório para concluir a etapa</li>
+      <li><strong>IMEIs</strong> — digite um por linha <em>ou</em> clique em
+        <strong>Inserir por planilha</strong> (.xlsx, .xls ou .csv)</li>
+    </ul>
+    <div class="box tip">
+      <div class="box-title">Dica de planilha</div>
+      Use uma coluna com cabeçalho <strong>IMEI</strong>, ou uma lista simples
+      de números. A importação preenche o campo automaticamente.
+    </div>
+
+    <h2>7. Pedidos finalizados</h2>
+    <p>
+      Quando a etapa de <strong>Pós-venda</strong> é concluída, o pedido vai
+      para <strong>Finalizados</strong>.
+    </p>
+    <ul>
+      <li>Use a busca por cliente, CPF, e-mail, nº do pedido, rastreio ou Prontosoft.</li>
+      <li>Clique no pedido para ver o histórico completo.</li>
+      <li>
+        O administrador pode <strong>excluir</strong> um pedido finalizado
+        pelo ícone da lixeira.
+      </li>
+      <li>
+        Os finalizados ficam no <strong>banco central</strong> do servidor —
+        a mesma lista aparece em qualquer local conectado ao sistema.
+      </li>
+    </ul>
+
+    <h2>8. Usuários (somente administrador)</h2>
+    <p>No menu <strong>Usuários</strong>, o admin pode:</p>
+    <ul>
+      <li>criar operadores (nome, login, senha);</li>
+      <li>escolher quais etapas cada operador pode executar;</li>
+      <li>ativar ou desativar um usuário;</li>
+      <li>editar as etapas atribuídas depois.</li>
+    </ul>
+
+    <div class="box warn">
+      <div class="box-title">Permissão por etapa</div>
+      Se um operador tentar atuar em uma etapa que não foi atribuída a ele,
+      o sistema bloqueia checklist e conclusão.
+    </div>
+
+    <h2>9. Produtos e renovação</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>Comportamento</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Mini Rastreador</strong></td>
+          <td>
+            Após a confirmação de recebimento, a <strong>Renovação</strong>
+            é agendada para daqui a 5 meses. Quando chegar a data, a etapa
+            fica disponível.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>LV-12 4G</strong></td>
+          <td>Segue o fluxo até o pós-venda, sem etapa de renovação.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>10. Dicas rápidas do dia a dia</h2>
+    <ul>
+      <li>Sempre conclua o checklist obrigatório antes de avançar.</li>
+      <li>Use observações da etapa para registrar detalhes da operação.</li>
+      <li>O histórico do pedido mostra quem iniciou e concluiu cada etapa.</li>
+      <li>No Kanban, os cards mostram status e tempo na etapa atual.</li>
+      <li>Em Finalizados, use a busca para localizar cliente rapidamente.</li>
+    </ul>
+
+    <h2>11. Problemas comuns</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Situação</th>
+          <th>O que fazer</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Não consigo entrar com o usuário</td>
+          <td>
+            Confirme login em minúsculas e a senha correta.
+            Saia da conta atual antes de trocar de usuário.
+          </td>
+        </tr>
+        <tr>
+          <td>Botão “Concluir etapa” bloqueado</td>
+          <td>
+            Verifique checklist incompleto, número Prontosoft (Cadastro)
+            ou código de rastreio (Expedição).
+          </td>
+        </tr>
+        <tr>
+          <td>Não consigo marcar o checklist</td>
+          <td>
+            Sua conta pode não ter permissão naquela etapa.
+            Peça ao admin para atribuir o processo.
+          </td>
+        </tr>
+        <tr>
+          <td>Pedido não aparece em Finalizados</td>
+          <td>
+            A etapa Pós-venda precisa estar concluída.
+            Depois use “Atualizar do servidor” se necessário.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>12. Contato de suporte</h2>
+    <p>
+      Em caso de dúvida operacional ou necessidade de ajuste no sistema,
+      fale com o responsável pela implantação:
+    </p>
+    <div class="box">
+      <strong>João Henrique dos Prazeres Schnitzspahn</strong><br />
+      WhatsApp: (47) 99737-3077
+    </div>
+
+    <div class="footer">
+      Sistema Infra — Manual do Usuário v1.0 · Documento destinado ao cliente final ·
+      Uso interno da operação
+    </div>
+  </div>
+</body>
+</html>
