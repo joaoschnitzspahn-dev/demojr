@@ -1,9 +1,10 @@
 # Guia de Deploy — Sistema Infra na Digital Ocean
+## Tudo no mesmo servidor (Droplet + PostgreSQL local)
 
-Passo a passo para colocar o sistema **online de verdade**, com **PostgreSQL gerenciado** (backup automático) para **não perder dados**.
+Passo a passo para colocar o sistema online com **banco PostgreSQL instalado no próprio Droplet** (sem Managed Database).
 
 Tempo estimado: 40–60 minutos  
-Custo aproximado: **US$ 12–24/mês**
+Custo aproximado: **US$ 6–12/mês** (só o Droplet)
 
 ---
 
@@ -11,74 +12,40 @@ Custo aproximado: **US$ 12–24/mês**
 
 | Peça | Função |
 |------|--------|
-| **Droplet** (servidor Ubuntu) | Roda o site + API Node |
-| **Managed PostgreSQL** | Banco permanente (pedidos, finalizados, usuários) |
-| **Nginx** | Domínio + HTTPS (opcional, recomendado) |
+| **Droplet Ubuntu** | Site + API Node + PostgreSQL |
+| **PostgreSQL no servidor** | Pedidos, finalizados e usuários |
+| **Nginx** | Acesso pelo IP/domínio |
 | **PM2** | Mantém o app sempre ligado |
+| **Backup diário (pg_dump)** | Evita perder dados |
 
-### Por que PostgreSQL Managed?
-
-- Dados **fora** do Droplet → se o servidor reiniciar ou for recriado, o banco continua
-- **Backup diário automático** da Digital Ocean
-- Ideal para Penha, Argentina ou qualquer lugar: todos usam o **mesmo banco**
+> Tudo fica **dentro do mesmo servidor**. Mais barato e mais simples de começar.
 
 ---
 
-## Checklist antes de começar
+## Checklist
 
 - [ ] Conta na [Digital Ocean](https://cloud.digitalocean.com)
-- [ ] Cartão cadastrado
-- [ ] Repositório no GitHub: `joaoschnitzspahn-dev/demojr`
-- [ ] (Opcional) Domínio próprio apontando para a DO
+- [ ] Repositório: `joaoschnitzspahn-dev/demojr`
+- [ ] (Opcional) Domínio
 
 ---
 
-## PASSO 1 — Criar o banco PostgreSQL (Managed Database)
-
-1. No painel Digital Ocean → **Databases** → **Create Database**
-2. Escolha:
-   - Engine: **PostgreSQL 16** (ou 15)
-   - Plano: **Basic** (menor) já serve para começar
-   - Região: a **mesma** do Droplet (ex.: São Paulo / NYC)
-3. Clique em **Create Database Cluster**
-4. Aguarde ficar **Online** (pode levar alguns minutos)
-5. Em **Users & Databases**, anote:
-   - User: normalmente `doadmin`
-   - Password
-   - Host
-   - Port: normalmente `25060`
-   - Database: `defaultdb`
-6. Em **Connection Details** → copie a **Connection string** (URI)
-
-Exemplo:
-
-```text
-postgresql://doadmin:SENHA@db-xxxxx-do-user-xxxxx-0.g.db.ondigitalocean.com:25060/defaultdb?sslmode=require
-```
-
-7. Em **Trusted Sources**, depois de criar o Droplet, adicione o Droplet (ou temporariamente “Allow all” só para testar — depois restrinja).
-
-> Guarde essa connection string: ela vai no arquivo `.env` do servidor.
-
----
-
-## PASSO 2 — Criar o Droplet (servidor)
+## PASSO 1 — Criar o Droplet
 
 1. **Create** → **Droplets**
 2. Configuração sugerida:
    - Image: **Ubuntu 24.04 LTS**
-   - Plan: **Basic → Regular → $6/mês** (1 GB) ou **$12** (2 GB, mais folgado)
-   - Datacenter: **mesma região do banco**
-   - Authentication: **SSH Key** (recomendado) ou senha
+   - Plan: **Basic → $6** (1 GB) ou **$12** (2 GB, melhor)
+   - Região: São Paulo / NYC (a que preferir)
+   - Auth: SSH Key (recomendado) ou senha
 3. Hostname: `sistema-infra`
-4. Create Droplet
-5. Anote o **IP público** (ex.: `167.99.xx.xx`)
+4. Create Droplet → anote o **IP**
 
 ---
 
-## PASSO 3 — Conectar no servidor
+## PASSO 2 — Conectar no servidor
 
-No PowerShell (Windows):
+No PowerShell:
 
 ```bash
 ssh root@SEU_IP_AQUI
@@ -86,17 +53,70 @@ ssh root@SEU_IP_AQUI
 
 ---
 
-## PASSO 4 — Instalar Node.js, Nginx e PM2
+## PASSO 3 — Instalar Node, Nginx, PM2 e PostgreSQL
 
-Cole no servidor (tudo de uma vez):
+Cole tudo de uma vez:
 
 ```bash
 apt update && apt upgrade -y
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs nginx git
+apt install -y nodejs nginx git postgresql postgresql-contrib
 npm install -g pm2
 node -v
-npm -v
+psql --version
+```
+
+Suba o Postgres:
+
+```bash
+systemctl enable postgresql
+systemctl start postgresql
+systemctl status postgresql --no-pager
+```
+
+---
+
+## PASSO 4 — Criar banco e usuário no PostgreSQL
+
+Entre como usuário postgres:
+
+```bash
+sudo -u postgres psql
+```
+
+Dentro do `psql`, cole (troque a senha se quiser):
+
+```sql
+CREATE USER infra WITH PASSWORD 'InfraDb#2026Troque';
+CREATE DATABASE sistema_infra OWNER infra;
+GRANT ALL PRIVILEGES ON DATABASE sistema_infra TO infra;
+\q
+```
+
+No PostgreSQL 15+, ainda rode:
+
+```bash
+sudo -u postgres psql -d sistema_infra -c "GRANT ALL ON SCHEMA public TO infra;"
+```
+
+Connection string local (vai no `.env`):
+
+```text
+postgresql://infra:InfraDb#2026Troque@127.0.0.1:5432/sistema_infra
+```
+
+> Se a senha tiver `#` ou caracteres especiais, no `.env` use aspas ou troque por uma senha só com letras/números, ex.: `InfraDb2026Segura`.
+
+Senha mais simples (recomendado para evitar dor de cabeça):
+
+```bash
+sudo -u postgres psql -c "ALTER USER infra WITH PASSWORD 'InfraDb2026Segura';"
+```
+
+URI final:
+
+```text
+postgresql://infra:InfraDb2026Segura@127.0.0.1:5432/sistema_infra
 ```
 
 ---
@@ -113,32 +133,30 @@ npm install
 
 ---
 
-## PASSO 6 — Configurar o banco (`.env`)
+## PASSO 6 — Arquivo `.env`
 
 ```bash
 nano /var/www/sistema-infra/.env
 ```
 
-Cole (troque pelos seus dados):
+Cole:
 
 ```env
 PORT=3001
 NODE_ENV=production
 ADMIN_LOGIN=adm
 ADMIN_PASSWORD=adm123
-DATABASE_URL=postgresql://doadmin:SENHA@HOST:25060/defaultdb?sslmode=require
-PGSSL=true
+DATABASE_URL=postgresql://infra:InfraDb2026Segura@127.0.0.1:5432/sistema_infra
+PGSSL=false
 ```
 
 Salve: `Ctrl+O` → Enter → `Ctrl+X`
 
-> Se o banco Managed exigir SSL (Digital Ocean exige), mantenha `sslmode=require` e `PGSSL=true`.
-
-No painel do Database → **Trusted Sources** → adicione o Droplet.
+> `PGSSL=false` porque o banco está **no mesmo servidor** (localhost).
 
 ---
 
-## PASSO 7 — Build e subir a aplicação
+## PASSO 7 — Build e subir o app
 
 ```bash
 cd /var/www/sistema-infra
@@ -148,13 +166,13 @@ pm2 save
 pm2 startup
 ```
 
-Teste a API:
+Teste:
 
 ```bash
 curl http://127.0.0.1:3001/api/health
 ```
 
-Você deve ver algo como:
+Deve aparecer algo como:
 
 ```json
 {
@@ -163,23 +181,28 @@ Você deve ver algo como:
 }
 ```
 
-Se `connected: true` → banco OK.  
-Se der erro, confira `DATABASE_URL` e Trusted Sources.
+Se `connected: true` → banco OK.
+
+Ver logs se der erro:
+
+```bash
+pm2 logs sistema-infra
+```
 
 ---
 
-## PASSO 8 — Nginx (site público)
+## PASSO 8 — Nginx (liberar na internet)
 
 ```bash
 nano /etc/nginx/sites-available/sistema-infra
 ```
 
-Cole:
+Cole (troque `SEU_IP_OU_DOMINIO`):
 
 ```nginx
 server {
     listen 80;
-    server_name SEU_DOMINIO_OU_IP;
+    server_name SEU_IP_OU_DOMINIO;
 
     client_max_body_size 20M;
 
@@ -206,33 +229,70 @@ nginx -t
 systemctl restart nginx
 ```
 
+Firewall:
+
+```bash
+ufw allow OpenSSH
+ufw allow 'Nginx Full'
+ufw --force enable
+```
+
 Abra no navegador: `http://SEU_IP`
 
-Login:
+Logins:
 - Admin: `adm` / `adm123`
 - Operador: `infra` / `infra123`
 
 ---
 
-## PASSO 9 — HTTPS (recomendado, se tiver domínio)
+## PASSO 9 — Backup diário (importante)
 
-1. No registro do domínio, crie um **A record**:
-   - Host: `@` (ou `app`)
-   - Value: IP do Droplet
-2. No servidor:
+Como o banco está no Droplet, configure backup automático:
 
 ```bash
-apt install -y certbot python3-certbot-nginx
-certbot --nginx -d seudominio.com
+mkdir -p /var/backups/sistema-infra
+nano /usr/local/bin/backup-sistema-infra.sh
 ```
 
-Siga o assistente. Renovação automática já fica configurada.
+Cole:
+
+```bash
+#!/bin/bash
+set -e
+DIR=/var/backups/sistema-infra
+STAMP=$(date +%Y%m%d-%H%M%S)
+FILE="$DIR/sistema_infra-$STAMP.sql.gz"
+export PGPASSWORD='InfraDb2026Segura'
+pg_dump -U infra -h 127.0.0.1 sistema_infra | gzip > "$FILE"
+find "$DIR" -type f -name '*.sql.gz' -mtime +14 -delete
+echo "Backup OK: $FILE"
+```
+
+Permissão + agendar todo dia às 3h:
+
+```bash
+chmod +x /usr/local/bin/backup-sistema-infra.sh
+crontab -e
+```
+
+Adicione a linha:
+
+```cron
+0 3 * * * /usr/local/bin/backup-sistema-infra.sh >> /var/log/backup-sistema-infra.log 2>&1
+```
+
+Teste agora:
+
+```bash
+/usr/local/bin/backup-sistema-infra.sh
+ls -lh /var/backups/sistema-infra
+```
+
+> Dica extra: baixe periodicamente esses `.sql.gz` para o seu PC (ou Google Drive).
 
 ---
 
-## PASSO 10 — Atualizar o sistema no futuro
-
-Sempre que subir alteração no GitHub:
+## PASSO 10 — Atualizar o sistema depois
 
 ```bash
 cd /var/www/sistema-infra
@@ -244,86 +304,73 @@ pm2 restart sistema-infra
 
 ---
 
-## O que fica salvo no PostgreSQL (não perde)
+## HTTPS (se tiver domínio)
 
-| Tabela | Conteúdo |
-|--------|----------|
-| `orders` | **Todos** os pedidos (em andamento + finalizados) |
-| `finished_orders` | Arquivo de finalizados |
-| `users` | Admin, infra e operadores criados |
+1. Aponte o domínio (registro A) para o IP do Droplet  
+2. No servidor:
 
-Assim:
-- Penha e Argentina veem os **mesmos dados**
-- Reiniciar Droplet **não apaga** o banco
-- Managed Database tem **backup diário** da Digital Ocean
+```bash
+apt install -y certbot python3-certbot-nginx
+certbot --nginx -d seudominio.com
+```
 
 ---
 
-## Firewall (segurança básica)
+## O que fica salvo no PostgreSQL
 
-```bash
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw enable
-ufw status
-```
+| Tabela | Conteúdo |
+|--------|----------|
+| `orders` | Todos os pedidos (em andamento + finalizados) |
+| `finished_orders` | Arquivo de finalizados |
+| `users` | Admin, infra e operadores |
+
+Penha e Argentina usam o **mesmo servidor** → mesmos dados.
 
 ---
 
 ## Problemas comuns
 
-### `database.connected: false`
-- `DATABASE_URL` errada
-- Droplet não está em Trusted Sources do banco
-- Senha com caracteres especiais: use a URI copiada do painel
+### `connected: false`
+```bash
+sudo systemctl status postgresql
+sudo -u postgres psql -c "\l"
+cat /var/www/sistema-infra/.env
+pm2 logs sistema-infra --lines 50
+```
 
 ### Site não abre
-- Nginx: `systemctl status nginx`
-- App: `pm2 logs sistema-infra`
-- Porta 80 liberada no firewall
+```bash
+systemctl status nginx
+pm2 status
+ufw status
+```
 
-### Login de operador não funciona
-- Confirme login em minúsculas (`infra`)
-- Rode `curl http://127.0.0.1:3001/api/users` e veja se o usuário está no banco
-
-### Depois do deploy, pedidos antigos do navegador
-- Na primeira sincronização, o sistema envia o que está no navegador para o PostgreSQL
-- Prefira começar “zerado” em produção e criar pedidos novos já no servidor online
-
----
-
-## Custos estimados (USD/mês)
-
-| Item | Plano | ~Custo |
-|------|-------|--------|
-| Droplet | Basic 1GB | $6 |
-| Managed PostgreSQL | Basic | $15 |
-| Domínio | opcional | variável |
-| **Total** | | **~$21** |
-
-Dá para começar só com Droplet + PostgreSQL instalado no próprio Droplet (mais barato, ~$6–12), mas **Managed Database** é o que garante “não perde nunca” com backup oficial.
+### Esqueci a senha do banco
+```bash
+sudo -u postgres psql -c "ALTER USER infra WITH PASSWORD 'NovaSenha123';"
+```
+Depois atualize o `.env` e rode `pm2 restart sistema-infra`.
 
 ---
 
-## Contatos de acesso após o ar
+## Custo
 
-Envie ao cliente:
-
-- URL do sistema  
-- Admin: `adm` / `adm123` *(troque a senha depois)*  
-- Operador: `infra` / `infra123`  
-- Manual PDF: `docs/Manual-Sistema-Infra.pdf`
+| Item | ~Valor |
+|------|--------|
+| Droplet 1–2 GB | US$ 6–12/mês |
+| Managed Database | **não usa** |
+| **Total** | **~US$ 6–12/mês** |
 
 ---
 
-## Resumo rápido (cola mental)
+## Resumo rápido
 
-1. Criar **Managed PostgreSQL**  
-2. Criar **Droplet Ubuntu**  
-3. Instalar Node + Nginx + PM2  
-4. Clonar repo + `.env` com `DATABASE_URL`  
+1. Criar Droplet Ubuntu  
+2. Instalar Node + Nginx + PM2 + PostgreSQL  
+3. Criar usuário/banco `sistema_infra`  
+4. Clonar repo + `.env` com `DATABASE_URL` localhost  
 5. `npm run build` + `pm2 start`  
-6. Nginx apontando para porta 3001  
-7. (Opcional) Certbot HTTPS  
+6. Nginx na porta 80 → 3001  
+7. Backup diário com `pg_dump`
 
-Quando estiver com o Droplet e o banco criados, me manda o IP (sem senhas) que eu te ajudo a validar o `curl /api/health` juntos.
+Quando tiver o IP do Droplet, me manda que a gente valida o `/api/health` juntos.

@@ -104,13 +104,14 @@ server {
 
 Se usar Vercel apenas para o frontend, configure `VITE_API_URL` apontando para sua API na Digital Ocean. O banco central precisa estar no servidor Node + PostgreSQL, não na Vercel.
 
-## Deploy completo (Digital Ocean + PostgreSQL)
+## Deploy completo (Digital Ocean — tudo no Droplet)
 
 Guia passo a passo: [`docs/DEPLOY-DIGITAL-OCEAN.md`](./docs/DEPLOY-DIGITAL-OCEAN.md)
 
 Resumo:
-1. Managed PostgreSQL (backup automático)
-2. Droplet Ubuntu + Node + PM2 + Nginx
-3. `DATABASE_URL` no `.env`
-4. `npm run build` + `pm2 start ecosystem.config.cjs`
+1. Droplet Ubuntu
+2. PostgreSQL **no mesmo servidor** (sem Managed Database)
+3. Node + PM2 + Nginx
+4. `DATABASE_URL=postgresql://...@127.0.0.1:5432/sistema_infra`
+5. Backup diário com `pg_dump`
 
