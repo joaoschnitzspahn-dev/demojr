@@ -62,6 +62,11 @@ export const WORKFLOW_STAGES: Record<
         label: 'Confirmar que o equipamento subiu na Ontime',
         required: true,
       },
+      {
+        id: 'cerca_ontime',
+        label: 'Criar cerca Ontime',
+        required: true,
+      },
       { id: 'informar', label: 'Informar o cliente', required: true },
       {
         id: 'confirmar_rastreio',
