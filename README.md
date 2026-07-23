@@ -102,4 +102,15 @@ server {
 
 ## Deploy (Vercel — só frontend)
 
-Se usar Vercel apenas para o frontend, configure `VITE_API_URL` apontando para sua API na Digital Ocean. O banco central precisa estar no servidor Node, não na Vercel.
+Se usar Vercel apenas para o frontend, configure `VITE_API_URL` apontando para sua API na Digital Ocean. O banco central precisa estar no servidor Node + PostgreSQL, não na Vercel.
+
+## Deploy completo (Digital Ocean + PostgreSQL)
+
+Guia passo a passo: [`docs/DEPLOY-DIGITAL-OCEAN.md`](./docs/DEPLOY-DIGITAL-OCEAN.md)
+
+Resumo:
+1. Managed PostgreSQL (backup automático)
+2. Droplet Ubuntu + Node + PM2 + Nginx
+3. `DATABASE_URL` no `.env`
+4. `npm run build` + `pm2 start ecosystem.config.cjs`
+

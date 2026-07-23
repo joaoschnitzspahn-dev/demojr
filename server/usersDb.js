@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasDatabaseUrl, query } from './pg.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -97,12 +98,34 @@ function ensureSeedUsers(users) {
   return next
 }
 
-export function listUsers() {
-  const db = readUsersDb()
-  return ensureSeedUsers(db.users)
+function rowToUser(row) {
+  return {
+    id: row.id,
+    login: row.login,
+    password: row.password,
+    name: row.name,
+    role: row.role,
+    assignedStages: row.assigned_stages,
+    active: row.active,
+    createdAt: row.created_at,
+    ...(row.data && typeof row.data === 'object' ? row.data : {}),
+  }
 }
 
-export function syncUsers(users) {
+export async function listUsers() {
+  if (hasDatabaseUrl()) {
+    const result = await query(
+      `SELECT id, login, password, name, role, assigned_stages, active, created_at, data
+       FROM users
+       ORDER BY created_at ASC`
+    )
+    return ensureSeedUsers(result.rows.map(rowToUser))
+  }
+
+  return ensureSeedUsers(readUsersDb().users)
+}
+
+export async function syncUsers(users) {
   if (!Array.isArray(users)) {
     throw new Error('Lista de usuários inválida.')
   }
@@ -124,11 +147,48 @@ export function syncUsers(users) {
       }))
   )
 
+  if (hasDatabaseUrl()) {
+    const client = (await import('./pg.js')).getPool()
+    const conn = await client.connect()
+    try {
+      await conn.query('BEGIN')
+      await conn.query('DELETE FROM users')
+      for (const u of cleaned) {
+        await conn.query(
+          `
+          INSERT INTO users
+            (id, login, password, name, role, assigned_stages, active, created_at, updated_at, data)
+          VALUES
+            ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, NOW(), '{}'::jsonb)
+        `,
+          [
+            u.id,
+            u.login,
+            u.password,
+            u.name,
+            u.role,
+            JSON.stringify(u.assignedStages),
+            u.active,
+            u.createdAt,
+          ]
+        )
+      }
+      await conn.query('COMMIT')
+    } catch (e) {
+      await conn.query('ROLLBACK')
+      throw e
+    } finally {
+      conn.release()
+    }
+    return cleaned
+  }
+
   writeUsersDb({ users: cleaned })
   return cleaned
 }
 
 export function getUsersDbPath() {
+  if (hasDatabaseUrl()) return 'postgresql (users)'
   ensureUsersDb()
   return USERS_DB_PATH
 }

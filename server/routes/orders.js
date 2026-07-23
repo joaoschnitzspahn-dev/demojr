@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import {
-  deleteFinishedOrder,
-  listFinishedOrders,
-  upsertFinishedOrder,
-} from '../db.js'
+  deleteOrder,
+  listOrders,
+  syncOrders,
+  upsertOrder,
+} from '../ordersDb.js'
 import { verifyAdmin, verifyApiKey } from '../auth.js'
 
 const router = Router()
@@ -17,7 +18,7 @@ function requireApiKey(req, res, next) {
 
 router.get('/', requireApiKey, async (_req, res) => {
   try {
-    res.json({ orders: await listFinishedOrders() })
+    res.json({ orders: await listOrders() })
   } catch (e) {
     res.status(500).json({
       error: e instanceof Error ? e.message : 'Erro ao listar pedidos.',
@@ -27,15 +28,12 @@ router.get('/', requireApiKey, async (_req, res) => {
 
 router.post('/', requireApiKey, async (req, res) => {
   const { order } = req.body ?? {}
-
-  if (!order?.id || !order.completedAt) {
-    return res.status(400).json({
-      error: 'Pedido inválido. Envie um pedido finalizado completo.',
-    })
+  if (!order?.id) {
+    return res.status(400).json({ error: 'Pedido inválido.' })
   }
 
   try {
-    const saved = await upsertFinishedOrder(order)
+    const saved = await upsertOrder(order)
     res.json({ ok: true, order: saved })
   } catch (e) {
     res.status(500).json({
@@ -46,44 +44,38 @@ router.post('/', requireApiKey, async (req, res) => {
 
 router.post('/sync', requireApiKey, async (req, res) => {
   const { orders } = req.body ?? {}
-
   if (!Array.isArray(orders)) {
     return res.status(400).json({ error: 'Lista de pedidos inválida.' })
   }
 
   try {
-    let synced = 0
-    for (const order of orders) {
-      if (order?.id && order.completedAt) {
-        await upsertFinishedOrder(order)
-        synced += 1
-      }
-    }
-
-    res.json({ ok: true, synced, orders: await listFinishedOrders() })
+    const result = await syncOrders(orders)
+    res.json({ ok: true, ...result })
   } catch (e) {
     res.status(500).json({
-      error: e instanceof Error ? e.message : 'Erro ao sincronizar.',
+      error: e instanceof Error ? e.message : 'Erro ao sincronizar pedidos.',
     })
   }
 })
 
 router.delete('/:id', requireApiKey, async (req, res) => {
   if (!verifyAdmin(req)) {
-    return res.status(403).json({ error: 'Apenas o administrador pode excluir.' })
+    return res
+      .status(403)
+      .json({ error: 'Apenas o administrador pode excluir.' })
   }
 
   try {
-    const deleted = await deleteFinishedOrder(req.params.id)
+    const deleted = await deleteOrder(req.params.id)
     if (!deleted) {
       return res.status(404).json({ error: 'Pedido não encontrado.' })
     }
     res.json({ ok: true })
   } catch (e) {
     res.status(500).json({
-      error: e instanceof Error ? e.message : 'Erro ao excluir.',
+      error: e instanceof Error ? e.message : 'Erro ao excluir pedido.',
     })
   }
 })
 
-export { router as finishedOrdersRouter }
+export { router as ordersRouter }

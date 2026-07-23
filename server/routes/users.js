@@ -11,11 +11,17 @@ function requireApiKey(req, res, next) {
   next()
 }
 
-router.get('/', requireApiKey, (_req, res) => {
-  res.json({ users: listUsers() })
+router.get('/', requireApiKey, async (_req, res) => {
+  try {
+    res.json({ users: await listUsers() })
+  } catch (e) {
+    res.status(500).json({
+      error: e instanceof Error ? e.message : 'Erro ao listar usuários.',
+    })
+  }
 })
 
-router.post('/sync', requireApiKey, (req, res) => {
+router.post('/sync', requireApiKey, async (req, res) => {
   const { users } = req.body ?? {}
 
   if (!Array.isArray(users)) {
@@ -23,7 +29,7 @@ router.post('/sync', requireApiKey, (req, res) => {
   }
 
   try {
-    const saved = syncUsers(users)
+    const saved = await syncUsers(users)
     res.json({ ok: true, users: saved })
   } catch (e) {
     res.status(400).json({

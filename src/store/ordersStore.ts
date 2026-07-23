@@ -24,6 +24,11 @@ import {
   saveFinishedOrder,
   syncFinishedOrders,
 } from '@/services/finishedOrdersApi'
+import {
+  deleteOrderOnServer,
+  saveOrderToServer,
+  syncAllOrders,
+} from '@/services/ordersApi'
 import type { Order, ProductType, WorkflowStageId } from '@/types/workflow'
 
 function getSessionUser() {
@@ -73,6 +78,49 @@ function mergeFinishedOrders(
   )
 
   return [...activeOrders, ...mergedFinished]
+}
+
+/** Mescla todos os pedidos (ativos + finalizados) priorizando o mais recente. */
+function mergeAllOrders(
+  localOrders: Order[],
+  serverOrders: Order[],
+  deletedIds: string[] = []
+): Order[] {
+  const deleted = new Set(deletedIds)
+  const byId = new Map<string, Order>()
+
+  for (const order of [...serverOrders, ...localOrders]) {
+    if (deleted.has(order.id)) continue
+    const existing = byId.get(order.id)
+    if (!existing) {
+      byId.set(order.id, order)
+      continue
+    }
+    const existingUpdated = new Date(
+      (existing as Order & { updatedAt?: string }).updatedAt ??
+        existing.completedAt ??
+        existing.createdAt
+    ).getTime()
+    const nextUpdated = new Date(
+      (order as Order & { updatedAt?: string }).updatedAt ??
+        order.completedAt ??
+        order.createdAt
+    ).getTime()
+    byId.set(order.id, nextUpdated >= existingUpdated ? order : existing)
+  }
+
+  return [...byId.values()].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+}
+
+function persistOrderRemote(order: Order) {
+  void saveOrderToServer(order).then((result) => {
+    if (result.ok && order.completedAt) {
+      void saveFinishedOrder(order)
+    }
+  })
 }
 
 type OrdersState = {
@@ -182,17 +230,29 @@ export const useOrdersStore = create<OrdersState>()(
 
         const state = get()
         const deletedIds = state.deletedFinishedOrderIds ?? []
-        const localFinished = state.orders.filter(
-          (o) => Boolean(o.completedAt) && !deletedIds.includes(o.id)
-        )
+        const localOrders = state.orders.filter((o) => !deletedIds.includes(o.id))
+        const localFinished = localOrders.filter((o) => Boolean(o.completedAt))
 
+        // 1) Sincroniza TODOS os pedidos (ativos + finalizados) no banco
+        const allSync = await syncAllOrders(localOrders)
+        if (allSync.ok && allSync.data) {
+          set((s) => ({
+            orders: refreshOrders(
+              mergeAllOrders(s.orders, allSync.data!, s.deletedFinishedOrderIds ?? [])
+            ),
+          }))
+        }
+
+        // 2) Mantém tabela de finalizados atualizada
         const syncResult = await syncFinishedOrders(localFinished)
         if (syncResult.ok && syncResult.data) {
           set((s) => ({
-            orders: mergeFinishedOrders(
-              s.orders,
-              syncResult.data!,
-              s.deletedFinishedOrderIds ?? []
+            orders: refreshOrders(
+              mergeFinishedOrders(
+                s.orders,
+                syncResult.data!,
+                s.deletedFinishedOrderIds ?? []
+              )
             ),
             serverOnline: true,
             syncingFinished: false,
@@ -201,13 +261,24 @@ export const useOrdersStore = create<OrdersState>()(
           return { ok: true }
         }
 
+        if (allSync.ok) {
+          set({
+            serverOnline: true,
+            syncingFinished: false,
+            lastAutoSyncAt: new Date().toISOString(),
+          })
+          return { ok: true }
+        }
+
         const fetchResult = await fetchFinishedOrders()
         if (fetchResult.ok && fetchResult.data) {
           set((s) => ({
-            orders: mergeFinishedOrders(
-              s.orders,
-              fetchResult.data!,
-              s.deletedFinishedOrderIds ?? []
+            orders: refreshOrders(
+              mergeFinishedOrders(
+                s.orders,
+                fetchResult.data!,
+                s.deletedFinishedOrderIds ?? []
+              )
             ),
             serverOnline: true,
             syncingFinished: false,
@@ -218,11 +289,13 @@ export const useOrdersStore = create<OrdersState>()(
 
         set({ serverOnline: false, syncingFinished: false })
         const errorMessage =
-          !syncResult.ok
-            ? syncResult.error
-            : !fetchResult.ok
-              ? fetchResult.error
-              : 'Erro ao sincronizar.'
+          !allSync.ok
+            ? allSync.error
+            : !syncResult.ok
+              ? syncResult.error
+              : !fetchResult.ok
+                ? fetchResult.error
+                : 'Erro ao sincronizar.'
         return { ok: false, error: errorMessage }
       },
 
@@ -265,6 +338,7 @@ export const useOrdersStore = create<OrdersState>()(
           selectedOrderId: newOrder.id,
           drawerOpen: true,
         }))
+        persistOrderRemote(newOrder)
       },
 
       toggleChecklistItem: ({ orderId, stageId, itemId, checked }) => {
@@ -291,6 +365,7 @@ export const useOrdersStore = create<OrdersState>()(
           const orders = [...state.orders]
           orders[idx] = nextOrder
           set({ orders })
+          persistOrderRemote(nextOrder)
           return { ok: true }
         } catch (e) {
           return {
@@ -316,6 +391,7 @@ export const useOrdersStore = create<OrdersState>()(
             })
             const orders = [...s.orders]
             orders[idx] = nextOrder
+            persistOrderRemote(nextOrder)
             return { orders }
           } catch {
             return s
@@ -341,6 +417,7 @@ export const useOrdersStore = create<OrdersState>()(
           const orders = [...state.orders]
           orders[idx] = nextOrder
           set({ orders })
+          persistOrderRemote(nextOrder)
           return { ok: true }
         } catch (e) {
           return {
@@ -374,6 +451,7 @@ export const useOrdersStore = create<OrdersState>()(
           const orders = [...state.orders]
           orders[idx] = nextOrder
           set({ orders })
+          persistOrderRemote(nextOrder)
           return { ok: true }
         } catch (e) {
           return {
@@ -411,6 +489,7 @@ export const useOrdersStore = create<OrdersState>()(
           const orders = [...state.orders]
           orders[idx] = nextOrder
           set({ orders })
+          persistOrderRemote(nextOrder)
           return { ok: true }
         } catch (e) {
           return {
@@ -461,6 +540,7 @@ export const useOrdersStore = create<OrdersState>()(
           const orders = [...state.orders]
           orders[idx] = updatedOrder
           set({ orders })
+          persistOrderRemote(updatedOrder)
 
           if (updatedOrder.completedAt) {
             void saveFinishedOrder(updatedOrder).then((result) => {
@@ -505,6 +585,12 @@ export const useOrdersStore = create<OrdersState>()(
         if (!apiResult.ok && !isDeleteServerOptionalError(apiResult.error)) {
           return apiResult
         }
+
+        void deleteOrderOnServer(
+          orderId,
+          adminRecord.login,
+          adminRecord.password
+        )
 
         set((s) => ({
           orders: s.orders.filter((o) => o.id !== orderId),

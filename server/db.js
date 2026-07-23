@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasDatabaseUrl, query } from './pg.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -33,7 +34,16 @@ function writeDb(data) {
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8')
 }
 
-export function listFinishedOrders() {
+export async function listFinishedOrders() {
+  if (hasDatabaseUrl()) {
+    const result = await query(
+      `SELECT data
+       FROM finished_orders
+       ORDER BY completed_at DESC NULLS LAST, updated_at DESC`
+    )
+    return result.rows.map((row) => row.data)
+  }
+
   return readDb().orders.sort(
     (a, b) =>
       new Date(b.completedAt || b.updatedAt || 0).getTime() -
@@ -41,28 +51,58 @@ export function listFinishedOrders() {
   )
 }
 
-export function upsertFinishedOrder(order) {
-  const db = readDb()
+export async function upsertFinishedOrder(order) {
   const now = new Date().toISOString()
-  const idx = db.orders.findIndex((o) => o.id === order.id)
-
   const record = {
     ...order,
     updatedAt: now,
     syncedAt: now,
   }
 
+  if (hasDatabaseUrl()) {
+    await query(
+      `
+      INSERT INTO finished_orders (id, number, client, completed_at, updated_at, data)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+      ON CONFLICT (id) DO UPDATE SET
+        number = EXCLUDED.number,
+        client = EXCLUDED.client,
+        completed_at = EXCLUDED.completed_at,
+        updated_at = EXCLUDED.updated_at,
+        data = EXCLUDED.data
+    `,
+      [
+        record.id,
+        record.number ?? null,
+        record.client ?? null,
+        record.completedAt ?? null,
+        now,
+        JSON.stringify(record),
+      ]
+    )
+    return record
+  }
+
+  const db = readDb()
+  const idx = db.orders.findIndex((o) => o.id === order.id)
   if (idx === -1) {
     db.orders.unshift(record)
   } else {
     db.orders[idx] = { ...db.orders[idx], ...record }
   }
-
   writeDb(db)
   return record
 }
 
-export function deleteFinishedOrder(orderId) {
+export async function deleteFinishedOrder(orderId) {
+  if (hasDatabaseUrl()) {
+    const result = await query(
+      `DELETE FROM finished_orders WHERE id = $1`,
+      [orderId]
+    )
+    return result.rowCount > 0
+  }
+
   const db = readDb()
   const before = db.orders.length
   db.orders = db.orders.filter((o) => o.id !== orderId)
@@ -72,6 +112,7 @@ export function deleteFinishedOrder(orderId) {
 }
 
 export function getDbPath() {
+  if (hasDatabaseUrl()) return 'postgresql (finished_orders)'
   ensureDbFile()
   return DB_PATH
 }
