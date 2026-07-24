@@ -36,8 +36,7 @@ export const DEFAULT_OPERATOR: AppUser = {
 
 /**
  * Operadores da equipe (login minúsculo, senha 123).
- * Observação: o workflow atual possui processos 1–7.
- * Rodrigo foi pedido para o processo 8 (ainda inexistente) — conta criada sem etapa.
+ * Renovação (após 5 meses) = processo 7 → Rodrigo.
  */
 export const TEAM_OPERATORS: AppUser[] = [
   {
@@ -46,7 +45,7 @@ export const TEAM_OPERATORS: AppUser[] = [
     password: '123',
     name: 'Kemellyn',
     role: 'operator',
-    assignedStages: [1, 5, 7],
+    assignedStages: [1, 5],
     active: true,
     createdAt: new Date(0).toISOString(),
   },
@@ -86,8 +85,7 @@ export const TEAM_OPERATORS: AppUser[] = [
     password: '123',
     name: 'Rodrigo',
     role: 'operator',
-    // Processo 8 ainda não existe no sistema — sem atribuição até definição.
-    assignedStages: [],
+    assignedStages: [7],
     active: true,
     createdAt: new Date(0).toISOString(),
   },
