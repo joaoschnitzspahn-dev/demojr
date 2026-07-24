@@ -101,14 +101,14 @@ export async function initDatabase() {
       'adm123',
       'Administrador Master',
       'admin',
-      JSON.stringify([1, 2, 3, 4, 5, 6]),
+      JSON.stringify([1, 2, 3, 4, 5, 6, 7]),
       JSON.stringify({}),
       'user-operator-infra',
       'infra',
       'infra123',
       'Infra',
       'operator',
-      JSON.stringify([1, 2, 3, 4, 5, 6]),
+      JSON.stringify([1, 2, 3, 4, 5, 6, 7]),
       JSON.stringify({}),
     ]
   )

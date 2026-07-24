@@ -59,7 +59,8 @@ export default function OrderKanbanCard({
               {order.client}
             </div>
             <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
-              {PRODUCT_LABELS[order.product]}
+              {PRODUCT_LABELS[order.product]} · {order.deviceQuantity ?? 1}{' '}
+              aparelho{(order.deviceQuantity ?? 1) > 1 ? 's' : ''}
             </div>
           </div>
           <Badge variant={statusBadge[status]}>{status}</Badge>

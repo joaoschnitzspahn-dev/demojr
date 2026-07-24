@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Archive, LayoutGrid, LogOut, Plus, Users } from 'lucide-react'
+import { Archive, Bell, LayoutGrid, LogOut, Plus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/utils/cn'
 import { Toaster } from '@/components/ui/toast'
@@ -65,6 +65,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Archive className="h-3.5 w-3.5" />
                 Finalizados
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/alertas')}
+                className={cn(
+                  location.pathname === '/alertas' &&
+                    'bg-[var(--bg-muted)] text-[var(--text-h)]'
+                )}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Alertas
               </Button>
               {isAdmin ? (
                 <Button

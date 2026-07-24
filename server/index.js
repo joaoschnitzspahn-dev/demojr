@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { finishedOrdersRouter } from './routes/finishedOrders.js'
 import { usersRouter } from './routes/users.js'
 import { ordersRouter } from './routes/orders.js'
+import { uploadsRouter } from './routes/uploads.js'
 import { getDbPath } from './db.js'
 import { getUsersDbPath } from './usersDb.js'
 import { getOrdersDbPath } from './ordersDb.js'
@@ -19,7 +20,7 @@ const isProd = process.env.NODE_ENV === 'production'
 const app = express()
 
 app.use(cors())
-app.use(express.json({ limit: '8mb' }))
+app.use(express.json({ limit: '16mb' }))
 
 app.get('/api/health', async (_req, res) => {
   const dbInfo = await getDatabaseInfo()
@@ -38,6 +39,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/finished-orders', finishedOrdersRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/orders', ordersRouter)
+app.use('/api/uploads', uploadsRouter)
 
 if (isProd) {
   const distPath = path.join(rootDir, 'dist')

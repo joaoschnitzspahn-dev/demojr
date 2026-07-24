@@ -66,7 +66,7 @@ export default function KanbanBoard({
   )
 
   const columns = React.useMemo(() => {
-    const hasRenovacao = boardOrders.some((o) => Boolean(o.stages[6]))
+    const hasRenovacao = boardOrders.some((o) => Boolean(o.stages[7]))
     return hasRenovacao ? ALL_WORKFLOW_STAGES : BASE_WORKFLOW_STAGES
   }, [boardOrders])
 

@@ -1,12 +1,16 @@
 import type { ChecklistItem, ProductType, WorkflowStageId } from '@/types/workflow'
 import { requiresRenovacao } from '@/constants/products'
 
-export const BASE_WORKFLOW_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5]
-export const RENOVACAO_STAGE_ID: WorkflowStageId = 6
-export const ALL_WORKFLOW_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6]
+/** Etapas operacionais (sem Renovação). */
+export const BASE_WORKFLOW_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6]
+export const RENOVACAO_STAGE_ID: WorkflowStageId = 7
+export const ALL_WORKFLOW_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6, 7]
 
 /** Alias — inclui Renovação para atribuição de usuários e Kanban. */
 export const WORKFLOW_STAGE_ORDER = ALL_WORKFLOW_STAGES
+
+/** Versão atual do mapa de processos (para migração de pedidos antigos). */
+export const CURRENT_WORKFLOW_VERSION = 2
 
 export const WORKFLOW_STAGES: Record<
   WorkflowStageId,
@@ -39,6 +43,16 @@ export const WORKFLOW_STAGES: Record<
   },
   2: {
     id: 2,
+    title: 'Nota Fiscal e Etiqueta',
+    description: 'Emitir NF, gerar etiqueta e anexar a Nota Fiscal.',
+    checklistTemplate: [
+      { id: 'emitir_nf', label: 'Emitir Nota Fiscal', required: true },
+      { id: 'gerar_etiqueta', label: 'Gerar Etiqueta', required: true },
+      { id: 'conferir_docs', label: 'Conferir documentos', required: true },
+    ],
+  },
+  3: {
+    id: 3,
     title: 'Expedição',
     description: 'Preparar e enviar o equipamento.',
     checklistTemplate: [
@@ -52,8 +66,8 @@ export const WORKFLOW_STAGES: Record<
       },
     ],
   },
-  3: {
-    id: 3,
+  4: {
+    id: 4,
     title: 'Acompanhamento da Entrega',
     description: 'Monitorar o envio até o cliente.',
     checklistTemplate: [
@@ -81,19 +95,14 @@ export const WORKFLOW_STAGES: Record<
       },
     ],
   },
-  4: {
-    id: 4,
+  5: {
+    id: 5,
     title: 'Confirmação de Recebimento',
     description: 'Finalizar a entrega e preparar a utilização do equipamento.',
     checklistTemplate: [
       {
         id: 'recebimento',
         label: 'Confirmar recebimento pelo cliente',
-        required: true,
-      },
-      {
-        id: 'desvincular',
-        label: 'Desvincular Tag da conta Ontime',
         required: true,
       },
       {
@@ -109,8 +118,8 @@ export const WORKFLOW_STAGES: Record<
       { id: 'tutoriais', label: 'Enviar tutoriais', required: true },
     ],
   },
-  5: {
-    id: 5,
+  6: {
+    id: 6,
     title: 'Pós-venda',
     description: 'Garantir que o cliente esteja utilizando corretamente o produto.',
     checklistTemplate: [
@@ -136,11 +145,16 @@ export const WORKFLOW_STAGES: Record<
       },
     ],
   },
-  6: {
-    id: 6,
+  7: {
+    id: 7,
     title: 'Renovação',
     description: 'Renovação do Mini Rastreador (agendada para 5 meses).',
     checklistTemplate: [
+      {
+        id: 'desvincular',
+        label: 'Desvincular Tag da conta Ontime',
+        required: true,
+      },
       {
         id: 'contato_renovacao',
         label: 'Entrar em contato com o cliente',
@@ -183,7 +197,7 @@ export function isFinalOperationalStage(
   product: ProductType
 ): boolean {
   // Pós-venda finaliza o pedido operacional; Renovação é processo agendado à parte.
-  if (stageId === 5) return true
-  if (stageId === 6 && requiresRenovacao(product)) return false
+  if (stageId === 6) return true
+  if (stageId === 7 && requiresRenovacao(product)) return false
   return getNextStageId(stageId, product) === null
 }

@@ -1,5 +1,9 @@
 import { OPERADOR_FICTICIO } from '@/constants/users'
-import { getStagesForProduct, WORKFLOW_STAGES } from '@/constants/workflowStages'
+import {
+  CURRENT_WORKFLOW_VERSION,
+  getStagesForProduct,
+  WORKFLOW_STAGES,
+} from '@/constants/workflowStages'
 import type {
   ChecklistItem,
   Order,
@@ -36,6 +40,7 @@ export type CreateOrderInput = {
   phone: string
   product: ProductType
   observations: string
+  deviceQuantity: number
   prontosoftOrderNumber?: string
   operatorId?: OperatorId
 }
@@ -48,6 +53,7 @@ export function createOrder({
   phone,
   product,
   observations,
+  deviceQuantity,
   prontosoftOrderNumber = '',
   operatorId = OPERADOR_FICTICIO,
 }: CreateOrderInput): Order {
@@ -75,6 +81,8 @@ export function createOrder({
     ),
   }
 
+  const qty = Math.max(1, Math.floor(Number(deviceQuantity) || 1))
+
   const order: Order = {
     id: crypto.randomUUID(),
     number,
@@ -84,10 +92,14 @@ export function createOrder({
     phone,
     product,
     observations,
+    deviceQuantity: qty,
     prontosoftOrderNumber: prontosoftOrderNumber.trim(),
     trackingCode: '',
     imeis: '',
     tags: '',
+    invoiceAttachment: null,
+    lastActivityAt: iso,
+    workflowVersion: CURRENT_WORKFLOW_VERSION,
     createdAt: iso,
     currentStageId: startStageId,
     completedAt: null,
@@ -105,7 +117,7 @@ export function createOrder({
         stageLabel,
         occurredAt: iso,
         responsible: operatorId,
-        message: `Pedido ${number} criado.`,
+        message: `Pedido ${number} criado (${qty} aparelho${qty > 1 ? 's' : ''}).`,
         notes: '',
       },
       {

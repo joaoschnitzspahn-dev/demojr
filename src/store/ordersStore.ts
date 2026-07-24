@@ -5,16 +5,19 @@ import { createOrder } from '@/services/orderService'
 import {
   activateRenovacaoIfDue,
   applyImeiSpreadsheetImport,
+  attachInvoiceToOrder,
   completeStage,
   ensureReminderStatuses,
   getCanCompleteStage,
   getOrderStatus as computeOrderStatus,
+  migrateWorkflowOrder,
   syncChecklistsWithTemplates,
   toggleChecklistItem,
   updateOrderShippingFields,
   updateProntosoftOrderNumber,
   updateStageObservations,
 } from '@/services/workflowService'
+import type { InvoiceAttachment } from '@/types/workflow'
 import { canUserWorkOnStage, isAdminUser } from '@/constants/users'
 import { useAuthStore } from '@/store/authStore'
 import {
@@ -39,11 +42,13 @@ function refreshOrders(orders: Order[]): Order[] {
   return orders.map((o) =>
     activateRenovacaoIfDue(
       ensureReminderStatuses(
-        syncChecklistsWithTemplates({
-          ...o,
-          prontosoftOrderNumber: o.prontosoftOrderNumber ?? '',
-          tags: o.tags ?? '',
-        })
+        syncChecklistsWithTemplates(
+          migrateWorkflowOrder({
+            ...o,
+            prontosoftOrderNumber: o.prontosoftOrderNumber ?? '',
+            tags: o.tags ?? '',
+          })
+        )
       )
     )
   )
@@ -148,8 +153,14 @@ type OrdersState = {
     phone: string
     product: ProductType
     observations: string
+    deviceQuantity: number
     prontosoftOrderNumber: string
   }) => void
+
+  attachInvoice: (input: {
+    orderId: string
+    attachment: InvoiceAttachment
+  }) => { ok: boolean; error?: string }
 
   toggleChecklistItem: (input: {
     orderId: string
@@ -329,6 +340,7 @@ export const useOrdersStore = create<OrdersState>()(
           phone: input.phone,
           product: input.product,
           observations: input.observations,
+          deviceQuantity: input.deviceQuantity,
           prontosoftOrderNumber: input.prontosoftOrderNumber,
           operatorId: user.name,
         })
@@ -430,7 +442,7 @@ export const useOrdersStore = create<OrdersState>()(
       importImeisFromSpreadsheet: ({ orderId, imeis, fileName }) => {
         const user = getSessionUser()
         if (!user) return { ok: false, error: 'Sessão expirada.' }
-        if (!canUserWorkOnStage(user, 2)) {
+        if (!canUserWorkOnStage(user, 3)) {
           return {
             ok: false,
             error: 'Você não tem permissão para atuar neste processo.',
@@ -464,6 +476,39 @@ export const useOrdersStore = create<OrdersState>()(
         }
       },
 
+      attachInvoice: ({ orderId, attachment }) => {
+        const user = getSessionUser()
+        if (!user) return { ok: false, error: 'Sessão expirada.' }
+        if (!canUserWorkOnStage(user, 2)) {
+          return {
+            ok: false,
+            error: 'Você não tem permissão para atuar neste processo.',
+          }
+        }
+
+        const state = get()
+        const idx = state.orders.findIndex((o) => o.id === orderId)
+        if (idx === -1) return { ok: false, error: 'Pedido não encontrado.' }
+
+        try {
+          const nextOrder = attachInvoiceToOrder({
+            order: state.orders[idx],
+            attachment,
+            operatorId: user.name,
+          })
+          const orders = [...state.orders]
+          orders[idx] = nextOrder
+          set({ orders })
+          persistOrderRemote(nextOrder)
+          return { ok: true }
+        } catch (e) {
+          return {
+            ok: false,
+            error:
+              e instanceof Error ? e.message : 'Erro ao anexar Nota Fiscal.',
+          }
+        }
+      },
       updateProntosoftNumber: ({ orderId, value }) => {
         const user = getSessionUser()
         if (!user) return { ok: false, error: 'Sessão expirada.' }
@@ -618,12 +663,12 @@ export const useOrdersStore = create<OrdersState>()(
       getOrderById: (id) => get().orders.find((o) => o.id === id),
       getOrderStatus: (order) => computeOrderStatus(order),
       getActiveOrders: () =>
-        refreshOrders(get().orders).filter((o) => !o.completedAt || o.currentStageId === 6),
+        refreshOrders(get().orders).filter((o) => !o.completedAt || o.currentStageId === 7),
       getFinishedOrders: () =>
         get().orders.filter((o) => Boolean(o.completedAt)),
     }),
     {
-      name: 'orders-workflow-v5',
+      name: 'orders-workflow-v6',
       partialize: (state) => ({
         orders: state.orders,
         seeded: state.seeded,

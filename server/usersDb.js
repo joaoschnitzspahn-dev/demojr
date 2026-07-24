@@ -15,7 +15,7 @@ const DEFAULT_ADMIN = {
   password: 'adm123',
   name: 'Administrador Master',
   role: 'admin',
-  assignedStages: [1, 2, 3, 4, 5, 6],
+  assignedStages: [1, 2, 3, 4, 5, 6, 7],
   active: true,
   createdAt: new Date(0).toISOString(),
 }
@@ -26,7 +26,7 @@ const DEFAULT_OPERATOR = {
   password: 'infra123',
   name: 'Infra',
   role: 'operator',
-  assignedStages: [1, 2, 3, 4, 5, 6],
+  assignedStages: [1, 2, 3, 4, 5, 6, 7],
   active: true,
   createdAt: new Date(0).toISOString(),
 }
@@ -88,7 +88,7 @@ function ensureSeedUsers(users) {
             login: 'infra',
             password: u.password || DEFAULT_OPERATOR.password,
             role: 'operator',
-            assignedStages: [1, 2, 3, 4, 5, 6],
+            assignedStages: [1, 2, 3, 4, 5, 6, 7],
             active: u.active !== false,
           }
         : u

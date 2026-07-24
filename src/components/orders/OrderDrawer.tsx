@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, FileText, Loader2 } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +23,7 @@ import { WORKFLOW_STAGES } from '@/constants/workflowStages'
 import { PRODUCT_LABELS } from '@/constants/products'
 import { formatDate, formatTime } from '@/utils/date'
 import { parseImeisFromSpreadsheet } from '@/utils/imeiImport'
+import { uploadInvoiceFile } from '@/services/uploadsApi'
 import { toast } from '@/components/ui/toast'
 
 export default function OrderDrawer() {
@@ -43,13 +44,16 @@ export default function OrderDrawer() {
   const importImeisFromSpreadsheet = useOrdersStore(
     (s) => s.importImeisFromSpreadsheet
   )
+  const attachInvoice = useOrdersStore((s) => s.attachInvoice)
   const tryCompleteCurrentStage = useOrdersStore(
     (s) => s.tryCompleteCurrentStage
   )
 
   const [notes, setNotes] = React.useState('')
   const [importingSheet, setImportingSheet] = React.useState(false)
+  const [uploadingInvoice, setUploadingInvoice] = React.useState(false)
   const sheetInputRef = React.useRef<HTMLInputElement>(null)
+  const invoiceInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     if (!drawerOpen || !order) {
@@ -75,9 +79,12 @@ export default function OrderDrawer() {
   const canComplete = checklistOk && hasStagePermission
   const checklistDisabled = stageState !== 'active' || !hasStagePermission
   const isOrderDone =
-    Boolean(order?.completedAt) && order?.currentStageId !== 6
-  const isExpedicao =
+    Boolean(order?.completedAt) && order?.currentStageId !== 7
+  const isNotaFiscal =
     order?.currentStageId === 2 && stageState === 'active'
+  const isExpedicao =
+    order?.currentStageId === 3 && stageState === 'active'
+  const canViewInvoice = Boolean(order?.invoiceAttachment)
   const dueReminders = order ? getDueReminders(order) : []
 
   return (
@@ -180,6 +187,18 @@ export default function OrderDrawer() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-xs text-[var(--text-muted)]">
+                    Quantidade de aparelhos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm font-medium text-[var(--text-h)]">
+                    {order.deviceQuantity ?? 1}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xs text-[var(--text-muted)]">
                     Prontosoft
                   </CardTitle>
                 </CardHeader>
@@ -250,7 +269,109 @@ export default function OrderDrawer() {
               </Card>
             </div>
 
-            {!isOrderDone || order.currentStageId === 6 ? (
+            {(isNotaFiscal || canViewInvoice) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Nota Fiscal</CardTitle>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {isNotaFiscal
+                      ? 'Anexe o arquivo da Nota Fiscal (obrigatório para concluir).'
+                      : 'Anexo disponível em modo somente leitura.'}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {order.invoiceAttachment ? (
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-3">
+                      <div className="flex items-start gap-2">
+                        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[var(--text-h)]">
+                            {order.invoiceAttachment.fileName}
+                          </p>
+                          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                            Enviado em{' '}
+                            {formatDate(order.invoiceAttachment.uploadedAt)}{' '}
+                            {formatTime(order.invoiceAttachment.uploadedAt)} ·{' '}
+                            {order.invoiceAttachment.uploadedBy}
+                          </p>
+                          <a
+                            href={order.invoiceAttachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-block text-xs font-medium text-[var(--accent)] hover:underline"
+                          >
+                            Visualizar arquivo
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {isNotaFiscal && !checklistDisabled ? (
+                    <div>
+                      <input
+                        ref={invoiceInputRef}
+                        type="file"
+                        accept=".pdf,.xml,image/*,application/pdf"
+                        className="hidden"
+                        disabled={uploadingInvoice}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          e.target.value = ''
+                          if (!file || !currentUser) return
+                          setUploadingInvoice(true)
+                          try {
+                            const uploaded = await uploadInvoiceFile({
+                              orderId: order.id,
+                              file,
+                              uploadedBy: currentUser.name,
+                            })
+                            if (!uploaded.ok) {
+                              toast.error('Upload falhou', uploaded.error)
+                              return
+                            }
+                            const result = attachInvoice({
+                              orderId: order.id,
+                              attachment: uploaded.data,
+                            })
+                            if (!result.ok) {
+                              toast.error(
+                                'Não foi possível anexar',
+                                result.error
+                              )
+                              return
+                            }
+                            toast.success('Nota Fiscal anexada', file.name)
+                          } finally {
+                            setUploadingInvoice(false)
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadingInvoice}
+                        onClick={() => invoiceInputRef.current?.click()}
+                      >
+                        {uploadingInvoice ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <FileText className="h-3.5 w-3.5" />
+                        )}
+                        {uploadingInvoice
+                          ? 'Enviando...'
+                          : order.invoiceAttachment
+                            ? 'Substituir arquivo'
+                            : 'Upload da Nota Fiscal'}
+                      </Button>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {!isOrderDone || order.currentStageId === 7 ? (
               <>
                 {!hasStagePermission ? (
                   <Card className="border-amber-200 bg-[var(--warning-bg)]">
@@ -463,8 +584,7 @@ export default function OrderDrawer() {
                       })
                       if (result.ok) {
                         setNotes('')
-                        const finishingPosVenda =
-                          order.currentStageId === 5
+                        const finishingPosVenda = order.currentStageId === 6
                         toast.success(
                           finishingPosVenda
                             ? 'Pedido finalizado'
@@ -488,10 +608,12 @@ export default function OrderDrawer() {
                     <p className="mt-2 text-center text-xs text-[var(--text-muted)]">
                       {!hasStagePermission
                         ? 'Você não tem permissão para concluir este processo.'
-                        : order.currentStageId === 2 &&
-                            !order.trackingCode.trim()
-                          ? 'Informe o código de rastreio para concluir.'
-                          : 'Marque todos os itens obrigatórios para concluir.'}
+                        : order.currentStageId === 2 && !order.invoiceAttachment
+                          ? 'Anexe a Nota Fiscal para concluir.'
+                          : order.currentStageId === 3 &&
+                              !order.trackingCode.trim()
+                            ? 'Informe o código de rastreio para concluir.'
+                            : 'Marque todos os itens obrigatórios para concluir.'}
                     </p>
                   ) : null}
                 </div>
@@ -505,7 +627,7 @@ export default function OrderDrawer() {
                   <p className="mt-1 text-xs text-[var(--text)]">
                     O pós-venda foi concluído. Este pedido está em Pedidos
                     Finalizados.
-                    {order.stages[6]?.scheduledFor &&
+                    {order.stages[7]?.scheduledFor &&
                     !order.renovacaoCompletedAt
                       ? ' A Renovação permanece agendada.'
                       : ''}

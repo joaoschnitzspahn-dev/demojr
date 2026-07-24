@@ -1,5 +1,5 @@
-/** Processos do fluxo operacional (1–5 sempre; 6 só Mini Rastreador). */
-export type WorkflowStageId = 1 | 2 | 3 | 4 | 5 | 6
+/** Processos do fluxo (1–6 sempre; 7 só Mini Rastreador). */
+export type WorkflowStageId = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export type ProductType = 'mini_rastreador' | 'lv12_4g'
 
@@ -47,6 +47,7 @@ export type HistoryEventType =
   | 'scheduled'
   | 'reminder'
   | 'field_updated'
+  | 'attachment_uploaded'
 
 export type OrderHistoryEvent = {
   id: string
@@ -71,6 +72,33 @@ export type OrderReminder = {
   label: string
 }
 
+/** Anexo da Nota Fiscal (upload no processo 2). */
+export type InvoiceAttachment = {
+  fileName: string
+  uploadedAt: string
+  uploadedBy: OperatorId
+  /** URL relativa para download/visualização. */
+  url: string
+  storageKey: string
+  mimeType: string
+  size: number
+}
+
+export type OrderAlertType = 'stalled_15m'
+
+export type OrderAlert = {
+  id: string
+  orderId: string
+  orderNumber: string
+  client: string
+  type: OrderAlertType
+  stageId: WorkflowStageId
+  stageLabel: string
+  message: string
+  createdAt: string
+  minutesIdle: number
+}
+
 export type Order = {
   id: string
   number: string
@@ -82,15 +110,27 @@ export type Order = {
   createdAt: string
   observations: string
 
+  /** Quantidade de aparelhos (obrigatória no cadastro). */
+  deviceQuantity: number
+
   /** Número do pedido no sistema Prontosoft. */
   prontosoftOrderNumber: string
 
   /** Código de rastreio (preenchido na Expedição). */
   trackingCode: string
-  /** IMEIs informados na Expedição — preparado para importação Excel. */
+  /** IMEIs informados na Expedição. */
   imeis: string
   /** Tags catalogadas. */
   tags: string
+
+  /** Nota Fiscal anexada no processo 2. */
+  invoiceAttachment: InvoiceAttachment | null
+
+  /** Última movimentação — usado para alerta de pedido parado. */
+  lastActivityAt: string
+
+  /** Versão do mapa de etapas (migração). */
+  workflowVersion?: number
 
   currentStageId: WorkflowStageId
   completedAt: string | null

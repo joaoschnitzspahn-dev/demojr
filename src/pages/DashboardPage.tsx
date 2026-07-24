@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus } from 'lucide-react'
+import { Bell, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import KanbanBoard from '@/components/orders/KanbanBoard'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,10 @@ import { isToday } from '@/utils/date'
 import {
   getDueReminders,
   getOrderStatus,
+  getStalledOrderAlerts,
   isActiveBoardOrder,
 } from '@/services/workflowService'
+import { STALLED_ORDER_MINUTES } from '@/constants/alerts'
 
 function StatCard({
   title,
@@ -51,6 +53,13 @@ export default function DashboardPage() {
 
   const orders = useOrdersStore((s) => s.orders)
   const loading = useOrdersStore((s) => s.loading)
+  const selectOrder = useOrdersStore((s) => s.selectOrder)
+  const [now, setNow] = React.useState(() => Date.now())
+
+  React.useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(t)
+  }, [])
 
   const activeOrders = React.useMemo(
     () => orders.filter(isActiveBoardOrder),
@@ -77,9 +86,12 @@ export default function DashboardPage() {
     [activeOrders]
   )
   const dueAlerts = React.useMemo(
-    () =>
-      orders.reduce((acc, o) => acc + getDueReminders(o).length, 0),
+    () => orders.reduce((acc, o) => acc + getDueReminders(o).length, 0),
     [orders]
+  )
+  const stalledAlerts = React.useMemo(
+    () => getStalledOrderAlerts(activeOrders, now),
+    [activeOrders, now]
   )
 
   return (
@@ -90,8 +102,8 @@ export default function DashboardPage() {
             Pedidos ativos
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Fluxo operacional: Cadastro → Expedição → Entrega → Recebimento →
-            Pós-venda.
+            Cadastro → Nota Fiscal e Etiqueta → Expedição → Entrega →
+            Recebimento → Pós-venda.
           </p>
         </div>
 
@@ -102,6 +114,45 @@ export default function DashboardPage() {
           </Button>
         </Link>
       </div>
+
+      {stalledAlerts.length > 0 ? (
+        <Card className="mt-6 border-amber-200 bg-[var(--warning-bg)]">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <Bell className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" />
+              <div>
+                <p className="text-sm font-medium text-[var(--warning)]">
+                  {stalledAlerts.length} pedido
+                  {stalledAlerts.length > 1 ? 's' : ''} parado
+                  {stalledAlerts.length > 1 ? 's' : ''} (+
+                  {STALLED_ORDER_MINUTES} min)
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--text)]">
+                  {stalledAlerts
+                    .slice(0, 3)
+                    .map((a) => `${a.orderNumber} (${a.minutesIdle} min)`)
+                    .join(' · ')}
+                  {stalledAlerts.length > 3
+                    ? ` · +${stalledAlerts.length - 3}`
+                    : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => selectOrder(stalledAlerts[0]!.orderId)}
+              >
+                Abrir primeiro
+              </Button>
+              <Link to="/alertas">
+                <Button size="sm">Central de Alertas</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
@@ -120,13 +171,13 @@ export default function DashboardPage() {
           title="Em andamento"
           value={inProgressCount}
           loading={loading}
-          subtitle="Processos 2–5"
+          subtitle="Processos 2–6"
         />
         <StatCard
           title="Alertas"
-          value={dueAlerts}
+          value={dueAlerts + stalledAlerts.length}
           loading={loading}
-          subtitle="Tarefas vencidas"
+          subtitle="Tarefas + parados"
         />
         <StatCard
           title="Finalizados"

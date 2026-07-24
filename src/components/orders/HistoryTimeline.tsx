@@ -10,6 +10,7 @@ const typeDot: Record<OrderHistoryEvent['type'], string> = {
   scheduled: 'bg-amber-500',
   reminder: 'bg-orange-400',
   field_updated: 'bg-violet-400',
+  attachment_uploaded: 'bg-emerald-500',
 }
 
 export default function HistoryTimeline({

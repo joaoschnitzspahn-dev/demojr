@@ -180,7 +180,7 @@ export default function PedidosFinalizadosPage() {
                   <Badge variant="neutral">
                     {PRODUCT_LABELS[order.product]}
                   </Badge>
-                  {order.stages[6]?.scheduledFor &&
+                  {order.stages[7]?.scheduledFor &&
                   !order.renovacaoCompletedAt ? (
                     <Badge variant="neutral">Renovação agendada</Badge>
                   ) : null}

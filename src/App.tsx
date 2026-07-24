@@ -3,6 +3,7 @@ import AppLayout from './layouts/AppLayout'
 import DashboardPage from './pages/DashboardPage'
 import CadastroPedidoPage from './pages/CadastroPedidoPage'
 import PedidosFinalizadosPage from './pages/PedidosFinalizadosPage'
+import CentralAlertasPage from './pages/CentralAlertasPage'
 import LoginPage from './pages/LoginPage'
 import UsuariosAdminPage from './pages/UsuariosAdminPage'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -48,6 +49,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <PedidosFinalizadosPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/alertas"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <CentralAlertasPage />
             </AppLayout>
           </ProtectedRoute>
         }

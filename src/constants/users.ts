@@ -6,7 +6,7 @@ export const ADMIN_PASSWORD = 'adm123'
 export const OPERATOR_LOGIN = 'infra'
 export const OPERATOR_PASSWORD = 'infra123'
 
-const ALL_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6]
+const ALL_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6, 7]
 
 export const DEFAULT_ADMIN: AppUser = {
   id: 'user-admin-master',
@@ -45,9 +45,22 @@ export function isAdminUser(user: AppUser | null | undefined): boolean {
 
 export function normalizeAppUser(user: AppUser): AppUser {
   const validStages = ALL_STAGES
-  const assignedStages = (user.assignedStages ?? []).filter((s) =>
+  let assignedStages = (user.assignedStages ?? []).filter((s) =>
     validStages.includes(s)
   )
+
+  // Migração: quem tinha as 6 etapas antigas recebe a nova etapa 2 (NF) e 7 (Renovação).
+  if (
+    assignedStages.includes(1) &&
+    assignedStages.includes(2) &&
+    assignedStages.includes(3) &&
+    assignedStages.includes(4) &&
+    assignedStages.includes(5) &&
+    assignedStages.includes(6) &&
+    !assignedStages.includes(7)
+  ) {
+    assignedStages = [...ALL_STAGES]
+  }
 
   if (user.login.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
     return {

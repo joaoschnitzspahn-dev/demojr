@@ -1,16 +1,20 @@
 import {
+  CURRENT_WORKFLOW_VERSION,
   getStageTitle,
   getStagesForProduct,
   WORKFLOW_STAGES,
 } from '@/constants/workflowStages'
+import { STALLED_ORDER_MS } from '@/constants/alerts'
 import { requiresRenovacao } from '@/constants/products'
 import { OPERADOR_FICTICIO } from '@/constants/users'
 import type {
   ChecklistItem,
+  InvoiceAttachment,
   Order,
+  OrderAlert,
   OrderHistoryEvent,
-  OrderReminder,
   OperatorId,
+  StageProgress,
   StageState,
   WorkflowStageId,
 } from '@/types/workflow'
@@ -38,6 +42,129 @@ function addMonths(iso: string, months: number) {
   const d = new Date(iso)
   d.setMonth(d.getMonth() + months)
   return d.toISOString()
+}
+
+function buildEmptyStage(stageId: WorkflowStageId): StageProgress {
+  return {
+    stageId,
+    startedAt: null,
+    finishedAt: null,
+    responsible: null,
+    observations: '',
+    checklist: WORKFLOW_STAGES[stageId].checklistTemplate.map((t) => ({
+      ...t,
+      checked: false,
+    })),
+    scheduledFor: null,
+  }
+}
+
+function touchActivity(order: Order, at = new Date().toISOString()): Order {
+  return { ...order, lastActivityAt: at }
+}
+
+/**
+ * Migra pedidos do workflow v1 (6 etapas) → v2 (7 etapas com NF/Etiqueta).
+ * Mapa antigo: 1 Cadastro, 2 Exp, 3 Acomp, 4 Receb, 5 Pós, 6 Renov
+ * Mapa novo:   1 Cadastro, 2 NF, 3 Exp, 4 Acomp, 5 Receb, 6 Pós, 7 Renov
+ */
+export function migrateWorkflowOrder(order: Order): Order {
+  const version = order.workflowVersion ?? 1
+  if (version >= CURRENT_WORKFLOW_VERSION) {
+    return {
+      ...order,
+      deviceQuantity: order.deviceQuantity ?? 1,
+      invoiceAttachment: order.invoiceAttachment ?? null,
+      lastActivityAt:
+        order.lastActivityAt ??
+        order.history[order.history.length - 1]?.occurredAt ??
+        order.createdAt,
+      workflowVersion: CURRENT_WORKFLOW_VERSION,
+    }
+  }
+
+  const oldStages = order.stages as Partial<
+    Record<number, StageProgress | undefined>
+  >
+
+  const mapOldToNew = (oldId: number): WorkflowStageId | null => {
+    if (oldId === 1) return 1
+    if (oldId === 2) return 3
+    if (oldId === 3) return 4
+    if (oldId === 4) return 5
+    if (oldId === 5) return 6
+    if (oldId === 6) return 7
+    return null
+  }
+
+  const stages: Order['stages'] = {}
+  for (const [key, stage] of Object.entries(oldStages)) {
+    const oldId = Number(key)
+    const newId = mapOldToNew(oldId)
+    if (!newId || !stage) continue
+    stages[newId] = { ...stage, stageId: newId }
+  }
+
+  // Inserir processo NF se ainda não existe
+  if (!stages[2]) {
+    const cadastroDone = Boolean(stages[1]?.finishedAt)
+    stages[2] = {
+      ...buildEmptyStage(2),
+      // Se já passou do cadastro no fluxo antigo, NF fica concluída (bypass histórico)
+      ...(cadastroDone && stages[3]
+        ? {
+            startedAt: stages[1]?.finishedAt ?? order.createdAt,
+            finishedAt: stages[1]?.finishedAt ?? order.createdAt,
+            responsible: stages[1]?.responsible ?? order.currentResponsible,
+            checklist: WORKFLOW_STAGES[2].checklistTemplate.map((t) => ({
+              ...t,
+              checked: true,
+            })),
+          }
+        : {}),
+    }
+  }
+
+  for (const id of getStagesForProduct(order.product)) {
+    if (!stages[id]) stages[id] = buildEmptyStage(id)
+  }
+
+  const oldCurrent = order.currentStageId as number
+  let currentStageId = (mapOldToNew(oldCurrent) ?? 1) as WorkflowStageId
+
+  // Se estava no Cadastro ativo, permanece; se já tinha avançado, mapeia.
+  // Pedidos no meio do fluxo antigo não voltam para NF se já tinham expedição.
+  if (oldCurrent === 1 && !stages[1]?.finishedAt) {
+    currentStageId = 1
+  }
+
+  const reminders = order.reminders.map((r) => {
+    const mapped = mapOldToNew(r.stageId as number)
+    return mapped ? { ...r, stageId: mapped } : r
+  })
+
+  const history = order.history.map((h) => {
+    if (h.stageId == null) return h
+    const mapped = mapOldToNew(h.stageId as number)
+    return mapped
+      ? { ...h, stageId: mapped, stageLabel: getStageTitle(mapped) }
+      : h
+  })
+
+  return {
+    ...order,
+    deviceQuantity: order.deviceQuantity ?? 1,
+    invoiceAttachment: order.invoiceAttachment ?? null,
+    lastActivityAt:
+      order.lastActivityAt ??
+      order.history[order.history.length - 1]?.occurredAt ??
+      order.createdAt,
+    workflowVersion: CURRENT_WORKFLOW_VERSION,
+    currentStageId,
+    stages,
+    reminders,
+    history,
+  }
 }
 
 export function getRequiredChecklistItems(stage: { checklist: ChecklistItem[] }) {
@@ -72,8 +199,12 @@ export function syncChecklistsWithTemplates(order: Order): Order {
   const stages = { ...order.stages }
 
   for (const stageId of stageIds) {
-    const stage = stages[stageId]
-    if (!stage) continue
+    let stage = stages[stageId]
+    if (!stage) {
+      changed = true
+      stages[stageId] = buildEmptyStage(stageId)
+      stage = stages[stageId]!
+    }
     const template = WORKFLOW_STAGES[stageId].checklistTemplate
     const byId = new Map(stage.checklist.map((i) => [i.id, i]))
     const nextChecklist = template.map((t) => {
@@ -114,14 +245,15 @@ export function getStageState(
   if (!stage) return 'locked'
   if (stage.finishedAt) return 'completed'
 
-  if (stageId === 6) {
+  // Renovação (agendada)
+  if (stageId === 7) {
     if (
       stage.scheduledFor &&
       new Date(stage.scheduledFor).getTime() > Date.now()
     ) {
       return 'scheduled'
     }
-    if (order.currentStageId === 6 && !order.renovacaoCompletedAt) {
+    if (order.currentStageId === 7 && !order.renovacaoCompletedAt) {
       return 'active'
     }
     if (
@@ -148,7 +280,8 @@ export function getCanCompleteStage(order: Order, stageId: WorkflowStageId) {
   const stage = order.stages[stageId]
   if (!stage) return false
   if (stageId === 1 && !order.prontosoftOrderNumber.trim()) return false
-  if (stageId === 2 && !order.trackingCode.trim()) return false
+  if (stageId === 2 && !order.invoiceAttachment) return false
+  if (stageId === 3 && !order.trackingCode.trim()) return false
   return isChecklistComplete(stage)
 }
 
@@ -162,8 +295,47 @@ export function getOrderStatus(
   return 'Em Andamento'
 }
 
-export function getDueReminders(order: Order): OrderReminder[] {
+export function getDueReminders(order: Order) {
   return order.reminders.filter((r) => r.status === 'due')
+}
+
+/** Pedidos sem movimentação há mais de 15 minutos. */
+export function getStalledOrderAlerts(
+  orders: Order[],
+  now = Date.now()
+): OrderAlert[] {
+  const alerts: OrderAlert[] = []
+
+  for (const order of orders) {
+    if (order.completedAt && order.currentStageId !== 7) continue
+    if (order.renovacaoCompletedAt) continue
+
+    const state = getStageState(order, order.currentStageId)
+    if (state !== 'active') continue
+
+    const last =
+      order.lastActivityAt ??
+      order.history[order.history.length - 1]?.occurredAt ??
+      order.createdAt
+    const idleMs = now - new Date(last).getTime()
+    if (idleMs < STALLED_ORDER_MS) continue
+
+    const minutesIdle = Math.floor(idleMs / 60000)
+    alerts.push({
+      id: `stalled-${order.id}`,
+      orderId: order.id,
+      orderNumber: order.number,
+      client: order.client,
+      type: 'stalled_15m',
+      stageId: order.currentStageId,
+      stageLabel: getStageTitle(order.currentStageId),
+      message: `Pedido parado há ${minutesIdle} min em ${getStageTitle(order.currentStageId)}.`,
+      createdAt: new Date(now).toISOString(),
+      minutesIdle,
+    })
+  }
+
+  return alerts.sort((a, b) => b.minutesIdle - a.minutesIdle)
 }
 
 /** Ativa Renovação quando a data agendada chega (pedido já finalizado). */
@@ -172,18 +344,18 @@ export function activateRenovacaoIfDue(order: Order): Order {
   if (order.renovacaoCompletedAt) return order
   if (!order.completedAt) return order
 
-  const stage = order.stages[6]
+  const stage = order.stages[7]
   if (!stage || stage.finishedAt || !stage.scheduledFor) return order
   if (new Date(stage.scheduledFor).getTime() > Date.now()) return order
-  if (stage.startedAt && order.currentStageId === 6) return order
+  if (stage.startedAt && order.currentStageId === 7) return order
 
   const occurredAt = new Date().toISOString()
-  const stageLabel = getStageTitle(6)
+  const stageLabel = getStageTitle(7)
 
   const startedEvent = createHistoryEvent({
     orderId: order.id,
     type: 'started',
-    stageId: 6,
+    stageId: 7,
     stageLabel,
     occurredAt,
     responsible: order.currentResponsible,
@@ -191,12 +363,12 @@ export function activateRenovacaoIfDue(order: Order): Order {
     notes: '',
   })
 
-  return {
+  return touchActivity({
     ...order,
-    currentStageId: 6,
+    currentStageId: 7,
     stages: {
       ...order.stages,
-      6: {
+      7: {
         ...stage,
         startedAt: stage.startedAt ?? occurredAt,
         responsible: order.currentResponsible,
@@ -208,7 +380,7 @@ export function activateRenovacaoIfDue(order: Order): Order {
         : r
     ),
     history: [...order.history, startedEvent],
-  }
+  }, occurredAt)
 }
 
 export function completeStage({
@@ -243,7 +415,13 @@ export function completeStage({
     )
   }
 
-  if (stageId === 2 && !order.trackingCode.trim()) {
+  if (stageId === 2 && !order.invoiceAttachment) {
+    throw new WorkflowError(
+      'Anexe a Nota Fiscal antes de concluir este processo.'
+    )
+  }
+
+  if (stageId === 3 && !order.trackingCode.trim()) {
     throw new WorkflowError('Informe o código de rastreio antes de concluir.')
   }
 
@@ -264,6 +442,7 @@ export function completeStage({
   const updatedOrder: Order = {
     ...order,
     currentResponsible: operatorId,
+    lastActivityAt: occurredAt,
     stages: { ...order.stages },
     reminders: [...order.reminders],
     history: [...order.history],
@@ -278,7 +457,7 @@ export function completeStage({
   updatedOrder.history.push(completedEvent)
 
   // —— Renovação ——
-  if (stageId === 6) {
+  if (stageId === 7) {
     updatedOrder.renovacaoCompletedAt = occurredAt
     updatedOrder.reminders = updatedOrder.reminders.map((r) =>
       r.type === 'renovacao_5m' ? { ...r, status: 'done' as const } : r
@@ -286,7 +465,7 @@ export function completeStage({
     const doneEvent = createHistoryEvent({
       orderId: order.id,
       type: 'completed',
-      stageId: 6,
+      stageId: 7,
       stageLabel,
       occurredAt,
       responsible: operatorId,
@@ -299,7 +478,7 @@ export function completeStage({
   }
 
   // —— Pós-venda → Pedidos Finalizados ——
-  if (stageId === 5) {
+  if (stageId === 6) {
     updatedOrder.completedAt = occurredAt
     updatedOrder.status = 'Concluídos'
     updatedOrder.reminders = updatedOrder.reminders.map((r) =>
@@ -309,7 +488,7 @@ export function completeStage({
     const finalizedEvent = createHistoryEvent({
       orderId: order.id,
       type: 'completed',
-      stageId: 5,
+      stageId: 6,
       stageLabel,
       occurredAt,
       responsible: operatorId,
@@ -322,11 +501,11 @@ export function completeStage({
   }
 
   // —— Após Confirmação + Mini: agenda Renovação ——
-  if (stageId === 4 && requiresRenovacao(order.product)) {
+  if (stageId === 5 && requiresRenovacao(order.product)) {
     const dueAt = addMonths(occurredAt, 5)
-    const renovacaoStage = updatedOrder.stages[6]
+    const renovacaoStage = updatedOrder.stages[7]
     if (renovacaoStage) {
-      updatedOrder.stages[6] = {
+      updatedOrder.stages[7] = {
         ...renovacaoStage,
         scheduledFor: dueAt,
       }
@@ -335,7 +514,7 @@ export function completeStage({
     updatedOrder.reminders.push({
       id: crypto.randomUUID(),
       type: 'renovacao_5m',
-      stageId: 6,
+      stageId: 7,
       dueAt,
       status: 'pending',
       label: 'Renovação Mini Rastreador (5 meses)',
@@ -344,8 +523,8 @@ export function completeStage({
     const scheduledEvent = createHistoryEvent({
       orderId: order.id,
       type: 'scheduled',
-      stageId: 6,
-      stageLabel: getStageTitle(6),
+      stageId: 7,
+      stageLabel: getStageTitle(7),
       occurredAt,
       responsible: operatorId,
       message: `Renovação agendada para ${new Date(dueAt).toLocaleDateString('pt-BR')}.`,
@@ -355,7 +534,7 @@ export function completeStage({
     updatedOrder.history.push(scheduledEvent)
   }
 
-  // Fluxo operacional sequencial: 1 → 2 → 3 → 4 → 5
+  // Fluxo operacional sequencial: 1 → 2 → 3 → 4 → 5 → 6
   const operationalNext = (stageId + 1) as WorkflowStageId
   const nextTitle = getStageTitle(operationalNext)
   const nextStageProgress = updatedOrder.stages[operationalNext]
@@ -400,12 +579,12 @@ export function completeStage({
     })),
   }
 
-  if (operationalNext === 5) {
+  if (operationalNext === 6) {
     const dueAt = addDays(occurredAt, 7)
     updatedOrder.reminders.push({
       id: crypto.randomUUID(),
       type: 'pos_venda_7d',
-      stageId: 5,
+      stageId: 6,
       dueAt,
       status: 'pending',
       label: 'Follow-up pós-venda (7 dias)',
@@ -414,7 +593,7 @@ export function completeStage({
     const reminderEvent = createHistoryEvent({
       orderId: order.id,
       type: 'reminder',
-      stageId: 5,
+      stageId: 6,
       stageLabel: nextTitle,
       occurredAt,
       responsible: operatorId,
@@ -457,7 +636,7 @@ export function toggleChecklistItem({
     throw new WorkflowError('Processo não encontrado.')
   }
 
-  return {
+  return touchActivity({
     ...order,
     stages: {
       ...order.stages,
@@ -468,7 +647,7 @@ export function toggleChecklistItem({
         ),
       },
     },
-  }
+  })
 }
 
 export function updateStageObservations({
@@ -489,13 +668,13 @@ export function updateStageObservations({
   const stage = order.stages[stageId]
   if (!stage) throw new WorkflowError('Processo não encontrado.')
 
-  return {
+  return touchActivity({
     ...order,
     stages: {
       ...order.stages,
       [stageId]: { ...stage, observations },
     },
-  }
+  })
 }
 
 export function updateOrderShippingFields({
@@ -509,7 +688,7 @@ export function updateOrderShippingFields({
   imeis?: string
   operatorId?: OperatorId
 }): Order {
-  if (getStageState(order, 2) !== 'active') {
+  if (getStageState(order, 3) !== 'active') {
     throw new WorkflowError(
       'Código de rastreio e IMEIs só podem ser editados na Expedição ativa.'
     )
@@ -527,12 +706,12 @@ export function updateOrderShippingFields({
     changes.push('IMEIs atualizados')
   }
 
-  const stage = next.stages[2]
+  const stage = next.stages[3]
   if (stage && trackingCode !== undefined) {
     const hasTracking = trackingCode.trim().length > 0
     next.stages = {
       ...next.stages,
-      2: {
+      3: {
         ...stage,
         checklist: stage.checklist.map((item) =>
           item.id === 'rastreio' ? { ...item, checked: hasTracking } : item
@@ -543,18 +722,22 @@ export function updateOrderShippingFields({
 
   if (changes.length === 0) return next
 
+  const occurredAt = new Date().toISOString()
   const event = createHistoryEvent({
     orderId: order.id,
     type: 'field_updated',
-    stageId: 2,
-    stageLabel: getStageTitle(2),
-    occurredAt: new Date().toISOString(),
+    stageId: 3,
+    stageLabel: getStageTitle(3),
+    occurredAt,
     responsible: operatorId,
     message: `${operatorId} atualizou: ${changes.join(', ')}.`,
     notes: '',
   })
 
-  return { ...next, history: [...order.history, event] }
+  return touchActivity(
+    { ...next, history: [...order.history, event] },
+    occurredAt
+  )
 }
 
 /** Aplica IMEIs importados de planilha. */
@@ -569,7 +752,7 @@ export function applyImeiSpreadsheetImport({
   fileName: string
   operatorId?: OperatorId
 }): Order {
-  if (getStageState(order, 2) !== 'active') {
+  if (getStageState(order, 3) !== 'active') {
     throw new WorkflowError(
       'Importação de planilha só é permitida na Expedição ativa.'
     )
@@ -579,27 +762,31 @@ export function applyImeiSpreadsheetImport({
     throw new WorkflowError('Nenhum IMEI encontrado na planilha.')
   }
 
-  if (!order.stages[2]) {
+  if (!order.stages[3]) {
     throw new WorkflowError('Processo de Expedição não encontrado.')
   }
 
+  const occurredAt = new Date().toISOString()
   const imeiText = imeis.join('\n')
   const event = createHistoryEvent({
     orderId: order.id,
     type: 'field_updated',
-    stageId: 2,
-    stageLabel: getStageTitle(2),
-    occurredAt: new Date().toISOString(),
+    stageId: 3,
+    stageLabel: getStageTitle(3),
+    occurredAt,
     responsible: operatorId,
     message: `${operatorId} importou ${imeis.length} IMEI(s) da planilha "${fileName}".`,
     notes: '',
   })
 
-  return {
-    ...order,
-    imeis: imeiText,
-    history: [...order.history, event],
-  }
+  return touchActivity(
+    {
+      ...order,
+      imeis: imeiText,
+      history: [...order.history, event],
+    },
+    occurredAt
+  )
 }
 
 /** Vincula o nº Prontosoft ao pedido e marca o checklist automaticamente. */
@@ -641,12 +828,13 @@ export function updateProntosoftOrderNumber({
 
   if (trimmed === previous) return next
 
+  const occurredAt = new Date().toISOString()
   const event = createHistoryEvent({
     orderId: order.id,
     type: 'field_updated',
     stageId: 1,
     stageLabel: getStageTitle(1),
-    occurredAt: new Date().toISOString(),
+    occurredAt,
     responsible: operatorId,
     message: trimmed
       ? `${operatorId} vinculou o pedido Prontosoft ${trimmed} ao cliente ${order.client}.`
@@ -654,7 +842,48 @@ export function updateProntosoftOrderNumber({
     notes: '',
   })
 
-  return { ...next, history: [...order.history, event] }
+  return touchActivity(
+    { ...next, history: [...order.history, event] },
+    occurredAt
+  )
+}
+
+/** Anexa Nota Fiscal no processo 2 (upload). */
+export function attachInvoiceToOrder({
+  order,
+  attachment,
+  operatorId = OPERADOR_FICTICIO,
+}: {
+  order: Order
+  attachment: InvoiceAttachment
+  operatorId?: OperatorId
+}): Order {
+  if (getStageState(order, 2) !== 'active') {
+    throw new WorkflowError(
+      'A Nota Fiscal só pode ser anexada no processo Nota Fiscal e Etiqueta ativo.'
+    )
+  }
+
+  const occurredAt = attachment.uploadedAt || new Date().toISOString()
+  const event = createHistoryEvent({
+    orderId: order.id,
+    type: 'attachment_uploaded',
+    stageId: 2,
+    stageLabel: getStageTitle(2),
+    occurredAt,
+    responsible: operatorId,
+    message: `${operatorId} anexou a Nota Fiscal "${attachment.fileName}".`,
+    notes: '',
+  })
+
+  return touchActivity(
+    {
+      ...order,
+      invoiceAttachment: attachment,
+      history: [...order.history, event],
+    },
+    occurredAt
+  )
 }
 
 export function getPipelineStages(order: Order): WorkflowStageId[] {
@@ -665,9 +894,9 @@ export function getPipelineStages(order: Order): WorkflowStageId[] {
 export function isActiveBoardOrder(order: Order): boolean {
   if (!order.completedAt) return true
   if (
-    order.currentStageId === 6 &&
+    order.currentStageId === 7 &&
     !order.renovacaoCompletedAt &&
-    getStageState(order, 6) === 'active'
+    getStageState(order, 7) === 'active'
   ) {
     return true
   }
