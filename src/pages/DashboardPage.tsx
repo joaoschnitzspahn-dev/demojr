@@ -15,6 +15,7 @@ import {
   isActiveBoardOrder,
 } from '@/services/workflowService'
 import { STALLED_ORDER_MINUTES } from '@/constants/alerts'
+import { useStalledOrderNotifications } from '@/hooks/useStalledOrderNotifications'
 
 function StatCard({
   title,
@@ -93,6 +94,7 @@ export default function DashboardPage() {
     () => getStalledOrderAlerts(activeOrders, now),
     [activeOrders, now]
   )
+  useStalledOrderNotifications(stalledAlerts)
 
   return (
     <div>

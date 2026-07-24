@@ -6,14 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useOrdersStore } from '@/store/ordersStore'
 import { useInitializeOrders } from '@/hooks/useInitializeOrders'
+import { useStalledOrderNotifications } from '@/hooks/useStalledOrderNotifications'
 import {
   getStalledOrderAlerts,
   isActiveBoardOrder,
 } from '@/services/workflowService'
 import {
   canUseBrowserNotifications,
-  prepareBrowserNotification,
+  getBrowserNotificationBlockReason,
   requestBrowserNotificationPermission,
+  showBrowserNotification,
   STALLED_ORDER_MINUTES,
 } from '@/constants/alerts'
 import { formatDate, formatTime } from '@/utils/date'
@@ -24,6 +26,7 @@ export default function CentralAlertasPage() {
   const selectOrder = useOrdersStore((s) => s.selectOrder)
   const [now, setNow] = React.useState(() => Date.now())
   const [notifPermission, setNotifPermission] = React.useState<string>('default')
+  const [feedback, setFeedback] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 30_000)
@@ -31,11 +34,15 @@ export default function CentralAlertasPage() {
   }, [])
 
   React.useEffect(() => {
-    if (canUseBrowserNotifications()) {
-      setNotifPermission(Notification.permission)
-    } else {
+    if (!('Notification' in window)) {
       setNotifPermission('unsupported')
+      return
     }
+    if (!canUseBrowserNotifications()) {
+      setNotifPermission('insecure')
+      return
+    }
+    setNotifPermission(Notification.permission)
   }, [])
 
   const active = React.useMemo(
@@ -46,19 +53,43 @@ export default function CentralAlertasPage() {
     () => getStalledOrderAlerts(active, now),
     [active, now]
   )
+  useStalledOrderNotifications(alerts)
 
   async function enableBrowserNotifications() {
+    setFeedback(null)
     const result = await requestBrowserNotificationPermission()
     setNotifPermission(result)
-    // Arquitetura pronta: payload montado, sem disparo realtime ainda.
-    if (result === 'granted' && alerts[0]) {
-      prepareBrowserNotification({
-        title: 'Pedido parado',
-        body: alerts[0].message,
-        tag: alerts[0].id,
+
+    if (result === 'insecure') {
+      setFeedback(getBrowserNotificationBlockReason())
+      return
+    }
+    if (result === 'unsupported') {
+      setFeedback('Este navegador não suporta notificações.')
+      return
+    }
+    if (result === 'denied') {
+      setFeedback(
+        'Permissão negada. No Chrome: cadeado ao lado da URL → Notificações → Permitir.'
+      )
+      return
+    }
+    if (result === 'granted') {
+      const sample = alerts[0]
+      showBrowserNotification({
+        title: sample ? 'Pedido parado' : 'Notificações ativas',
+        body: sample
+          ? `${sample.orderNumber} · ${sample.client} — ${sample.message}`
+          : 'Você receberá alertas quando um pedido ficar parado.',
+        tag: sample?.id ?? 'notif-enabled',
       })
+      setFeedback('Notificações do Chrome liberadas.')
     }
   }
+
+  const blockReason = getBrowserNotificationBlockReason()
+  const canRequest =
+    canUseBrowserNotifications() && notifPermission !== 'granted'
 
   return (
     <div>
@@ -71,20 +102,28 @@ export default function CentralAlertasPage() {
             Pedidos sem movimentação há mais de {STALLED_ORDER_MINUTES} minutos.
           </p>
         </div>
-        {canUseBrowserNotifications() ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void enableBrowserNotifications()}
-            disabled={notifPermission === 'granted'}
-          >
-            <BellRing className="h-3.5 w-3.5" />
-            {notifPermission === 'granted'
-              ? 'Notificações liberadas'
-              : 'Preparar notificações do Chrome'}
-          </Button>
-        ) : null}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void enableBrowserNotifications()}
+          disabled={notifPermission === 'granted'}
+        >
+          <BellRing className="h-3.5 w-3.5" />
+          {notifPermission === 'granted'
+            ? 'Notificações liberadas'
+            : canRequest
+              ? 'Ativar notificações do Chrome'
+              : 'Ver status das notificações'}
+        </Button>
       </div>
+
+      {feedback || blockReason ? (
+        <Card className="mt-4 border-amber-200 bg-[var(--warning-bg)]">
+          <CardContent className="p-4 text-sm text-[var(--text)]">
+            {feedback ?? blockReason}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Card>
@@ -114,10 +153,14 @@ export default function CentralAlertasPage() {
             </div>
             <div className="mt-1.5 text-sm font-medium text-[var(--text-h)]">
               {notifPermission === 'granted'
-                ? 'Permissão concedida (pronta para uso futuro)'
-                : notifPermission === 'unsupported'
-                  ? 'Não suportado neste navegador'
-                  : 'Aguardando liberação'}
+                ? 'Ativas — Chrome notifica pedidos parados'
+                : notifPermission === 'insecure'
+                  ? 'Requer HTTPS'
+                  : notifPermission === 'unsupported'
+                    ? 'Não suportado neste navegador'
+                    : notifPermission === 'denied'
+                      ? 'Bloqueadas no Chrome'
+                      : 'Aguardando liberação'}
             </div>
           </CardContent>
         </Card>
