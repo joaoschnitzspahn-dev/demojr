@@ -48,6 +48,7 @@ export type HistoryEventType =
   | 'reminder'
   | 'field_updated'
   | 'attachment_uploaded'
+  | 'stock_debit'
 
 export type OrderHistoryEvent = {
   id: string

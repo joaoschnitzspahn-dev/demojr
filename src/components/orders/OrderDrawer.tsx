@@ -24,6 +24,7 @@ import { PRODUCT_LABELS } from '@/constants/products'
 import { formatDate, formatTime } from '@/utils/date'
 import { parseImeisFromSpreadsheet } from '@/utils/imeiImport'
 import { uploadInvoiceFile } from '@/services/uploadsApi'
+import { useStockStore } from '@/store/stockStore'
 import { toast } from '@/components/ui/toast'
 
 export default function OrderDrawer() {
@@ -578,9 +579,32 @@ export default function OrderDrawer() {
                     className="w-full"
                     disabled={!canComplete}
                     onClick={() => {
+                      let debitStock: boolean | undefined
+
+                      if (order.currentStageId === 3) {
+                        const wantsDebit = window.confirm(
+                          'Deseja dar baixa no estoque?'
+                        )
+                        debitStock = wantsDebit
+                        if (wantsDebit) {
+                          const qty = order.deviceQuantity ?? 1
+                          const check = useStockStore
+                            .getState()
+                            .canDebitForOrder(order.product, qty)
+                          if (!check.ok) {
+                            toast.error(
+                              'Estoque insuficiente',
+                              check.error
+                            )
+                            return
+                          }
+                        }
+                      }
+
                       const result = tryCompleteCurrentStage({
                         orderId: order.id,
                         notes,
+                        debitStock,
                       })
                       if (result.ok) {
                         setNotes('')
@@ -591,7 +615,9 @@ export default function OrderDrawer() {
                             : 'Processo concluído',
                           finishingPosVenda
                             ? 'Movido para Pedidos Finalizados.'
-                            : 'Próximo processo liberado.'
+                            : debitStock
+                              ? 'Baixa de estoque registrada e próximo processo liberado.'
+                              : 'Próximo processo liberado.'
                         )
                       } else {
                         toast.error(

@@ -4,6 +4,7 @@ import DashboardPage from './pages/DashboardPage'
 import CadastroPedidoPage from './pages/CadastroPedidoPage'
 import PedidosFinalizadosPage from './pages/PedidosFinalizadosPage'
 import CentralAlertasPage from './pages/CentralAlertasPage'
+import EstoquePage from './pages/EstoquePage'
 import LoginPage from './pages/LoginPage'
 import UsuariosAdminPage from './pages/UsuariosAdminPage'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -60,6 +61,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <CentralAlertasPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/estoque"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <EstoquePage />
             </AppLayout>
           </ProtectedRoute>
         }

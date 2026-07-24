@@ -31,7 +31,18 @@ const DEFAULT_OPERATOR = {
   createdAt: new Date(0).toISOString(),
 }
 
-const SEED_USERS = [DEFAULT_ADMIN, DEFAULT_OPERATOR]
+const DEFAULT_EXPEDICAO = {
+  id: 'user-operator-expedicao',
+  login: 'expedicao',
+  password: '123',
+  name: 'Expedição',
+  role: 'operator',
+  assignedStages: [3],
+  active: true,
+  createdAt: new Date(0).toISOString(),
+}
+
+const SEED_USERS = [DEFAULT_ADMIN, DEFAULT_OPERATOR, DEFAULT_EXPEDICAO]
 
 function ensureUsersDb() {
   const dir = path.dirname(USERS_DB_PATH)
@@ -89,6 +100,28 @@ function ensureSeedUsers(users) {
             password: u.password || DEFAULT_OPERATOR.password,
             role: 'operator',
             assignedStages: [1, 2, 3, 4, 5, 6, 7],
+            active: u.active !== false,
+          }
+        : u
+    )
+  }
+
+  const hasExpedicao = next.some(
+    (u) => String(u.login).toLowerCase() === 'expedicao'
+  )
+  if (!hasExpedicao) {
+    next = [...next, DEFAULT_EXPEDICAO]
+  } else {
+    next = next.map((u) =>
+      String(u.login).toLowerCase() === 'expedicao'
+        ? {
+            ...DEFAULT_EXPEDICAO,
+            ...u,
+            login: 'expedicao',
+            password: u.password || DEFAULT_EXPEDICAO.password,
+            name: u.name || DEFAULT_EXPEDICAO.name,
+            role: 'operator',
+            assignedStages: [3],
             active: u.active !== false,
           }
         : u

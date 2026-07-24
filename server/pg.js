@@ -86,13 +86,14 @@ export async function initDatabase() {
     ON orders (updated_at DESC);
   `)
 
-  // Seeds admin + infra
+  // Seeds admin + infra + expedicao
   await query(
     `
     INSERT INTO users (id, login, password, name, role, assigned_stages, active, created_at, data)
     VALUES
       ($1, $2, $3, $4, $5, $6::jsonb, TRUE, to_timestamp(0), $7::jsonb),
-      ($8, $9, $10, $11, $12, $13::jsonb, TRUE, to_timestamp(0), $14::jsonb)
+      ($8, $9, $10, $11, $12, $13::jsonb, TRUE, to_timestamp(0), $14::jsonb),
+      ($15, $16, $17, $18, $19, $20::jsonb, TRUE, to_timestamp(0), $21::jsonb)
     ON CONFLICT (login) DO NOTHING;
   `,
     [
@@ -109,6 +110,13 @@ export async function initDatabase() {
       'Infra',
       'operator',
       JSON.stringify([1, 2, 3, 4, 5, 6, 7]),
+      JSON.stringify({}),
+      'user-operator-expedicao',
+      'expedicao',
+      '123',
+      'Expedição',
+      'operator',
+      JSON.stringify([3]),
       JSON.stringify({}),
     ]
   )

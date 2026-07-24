@@ -11,6 +11,7 @@ const typeDot: Record<OrderHistoryEvent['type'], string> = {
   reminder: 'bg-orange-400',
   field_updated: 'bg-violet-400',
   attachment_uploaded: 'bg-emerald-500',
+  stock_debit: 'bg-teal-500',
 }
 
 export default function HistoryTimeline({

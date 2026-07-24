@@ -5,7 +5,7 @@ import {
   WORKFLOW_STAGES,
 } from '@/constants/workflowStages'
 import { STALLED_ORDER_MS } from '@/constants/alerts'
-import { requiresRenovacao } from '@/constants/products'
+import { PRODUCT_LABELS, requiresRenovacao } from '@/constants/products'
 import { OPERADOR_FICTICIO } from '@/constants/users'
 import type {
   ChecklistItem,
@@ -880,6 +880,38 @@ export function attachInvoiceToOrder({
     {
       ...order,
       invoiceAttachment: attachment,
+      history: [...order.history, event],
+    },
+    occurredAt
+  )
+}
+
+/** Registra baixa de estoque no histórico do pedido (desacoplado do estoque). */
+export function recordStockDebitHistory({
+  order,
+  quantity,
+  operatorId = OPERADOR_FICTICIO,
+}: {
+  order: Order
+  quantity: number
+  operatorId?: OperatorId
+}): Order {
+  const occurredAt = new Date().toISOString()
+  const productLabel = PRODUCT_LABELS[order.product]
+  const event = createHistoryEvent({
+    orderId: order.id,
+    type: 'stock_debit',
+    stageId: 3,
+    stageLabel: getStageTitle(3),
+    occurredAt,
+    responsible: operatorId,
+    message: `Baixa de estoque realizada automaticamente. Produto: ${productLabel}. Quantidade: ${quantity}.`,
+    notes: '',
+  })
+
+  return touchActivity(
+    {
+      ...order,
       history: [...order.history, event],
     },
     occurredAt

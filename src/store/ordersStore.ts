@@ -11,6 +11,7 @@ import {
   getCanCompleteStage,
   getOrderStatus as computeOrderStatus,
   migrateWorkflowOrder,
+  recordStockDebitHistory,
   syncChecklistsWithTemplates,
   toggleChecklistItem,
   updateOrderShippingFields,
@@ -20,6 +21,7 @@ import {
 import type { InvoiceAttachment } from '@/types/workflow'
 import { canUserWorkOnStage, isAdminUser } from '@/constants/users'
 import { useAuthStore } from '@/store/authStore'
+import { useStockStore } from '@/store/stockStore'
 import {
   deleteFinishedOrderApi,
   fetchFinishedOrders,
@@ -195,6 +197,8 @@ type OrdersState = {
   tryCompleteCurrentStage: (input: {
     orderId: string
     notes: string
+    /** Na Expedição: se true, tenta dar baixa no estoque antes de concluir. */
+    debitStock?: boolean
   }) => { ok: boolean; error?: string }
 
   deleteFinishedOrder: (
@@ -547,7 +551,7 @@ export const useOrdersStore = create<OrdersState>()(
         }
       },
 
-      tryCompleteCurrentStage: ({ orderId, notes }) => {
+      tryCompleteCurrentStage: ({ orderId, notes, debitStock }) => {
         const user = getSessionUser()
         if (!user) return { ok: false, error: 'Sessão expirada.' }
 
@@ -570,18 +574,47 @@ export const useOrdersStore = create<OrdersState>()(
             error:
               order.currentStageId === 1 && !order.prontosoftOrderNumber.trim()
                 ? 'Informe o número do pedido na Prontosoft no checklist.'
-                : order.currentStageId === 2 && !order.trackingCode.trim()
-                  ? 'Informe o código de rastreio.'
-                  : 'Checklist obrigatório incompleto.',
+                : order.currentStageId === 2 && !order.invoiceAttachment
+                  ? 'Anexe a Nota Fiscal.'
+                  : order.currentStageId === 3 && !order.trackingCode.trim()
+                    ? 'Informe o código de rastreio.'
+                    : 'Checklist obrigatório incompleto.',
+          }
+        }
+
+        const shouldDebit =
+          order.currentStageId === 3 && Boolean(debitStock)
+        const qty = order.deviceQuantity ?? 1
+
+        if (shouldDebit) {
+          const debitResult = useStockStore
+            .getState()
+            .tryDebitForOrder(order.product, qty)
+          if (!debitResult.ok) {
+            return {
+              ok: false,
+              error:
+                debitResult.error ??
+                'Estoque insuficiente para concluir a baixa.',
+            }
           }
         }
 
         try {
-          const { updatedOrder } = completeStage({
+          let { updatedOrder } = completeStage({
             order,
             operatorId: user.name,
             notes,
           })
+
+          if (shouldDebit) {
+            updatedOrder = recordStockDebitHistory({
+              order: updatedOrder,
+              quantity: qty,
+              operatorId: user.name,
+            })
+          }
+
           const orders = [...state.orders]
           orders[idx] = updatedOrder
           set({ orders })
@@ -597,6 +630,9 @@ export const useOrdersStore = create<OrdersState>()(
 
           return { ok: true }
         } catch (e) {
+          if (shouldDebit) {
+            useStockStore.getState().addStock(order.product, qty)
+          }
           return {
             ok: false,
             error: e instanceof Error ? e.message : 'Erro ao concluir processo.',

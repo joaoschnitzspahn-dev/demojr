@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Archive, Bell, LayoutGrid, LogOut, Plus, Users } from 'lucide-react'
+import { Archive, Bell, LayoutGrid, LogOut, Package, Plus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/utils/cn'
 import { Toaster } from '@/components/ui/toast'
@@ -77,6 +77,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Bell className="h-3.5 w-3.5" />
                 Alertas
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/estoque')}
+                className={cn(
+                  location.pathname === '/estoque' &&
+                    'bg-[var(--bg-muted)] text-[var(--text-h)]'
+                )}
+              >
+                <Package className="h-3.5 w-3.5" />
+                Estoque
               </Button>
               {isAdmin ? (
                 <Button
