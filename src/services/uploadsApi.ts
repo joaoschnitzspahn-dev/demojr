@@ -1,48 +1,55 @@
 import type { InvoiceAttachment } from '@/types/workflow'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export async function uploadInvoiceFile(input: {
   orderId: string
   file: File
   uploadedBy: string
 }): Promise<{ ok: true; data: InvoiceAttachment } | { ok: false; error: string }> {
-  try {
-    const buffer = await input.file.arrayBuffer()
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!)
-    }
-    const base64 = btoa(binary)
+  if (input.file.size > 12 * 1024 * 1024) {
+    return { ok: false, error: 'Arquivo maior que 12 MB.' }
+  }
 
-    const res = await fetch(`${API_BASE}/api/uploads/invoice`, {
+  try {
+    const form = new FormData()
+    form.append('file', input.file)
+    form.append('orderId', input.orderId)
+    form.append('uploadedBy', input.uploadedBy)
+
+    const res = await fetch(`${API_BASE}/uploads/invoice`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: input.orderId,
-        fileName: input.file.name,
-        mimeType: input.file.type || 'application/octet-stream',
-        base64,
-        uploadedBy: input.uploadedBy,
-      }),
+      body: form,
     })
 
-    const json = (await res.json()) as {
-      ok: boolean
+    const text = await res.text()
+    let json: {
+      ok?: boolean
       data?: InvoiceAttachment
       error?: string
+    } = {}
+    try {
+      json = text ? (JSON.parse(text) as typeof json) : {}
+    } catch {
+      return {
+        ok: false,
+        error: `Resposta inválida do servidor (HTTP ${res.status}). Tente novamente.`,
+      }
     }
 
     if (!res.ok || !json.ok || !json.data) {
-      return { ok: false, error: json.error || 'Falha no upload da Nota Fiscal.' }
+      return {
+        ok: false,
+        error: json.error || `Falha no upload da Nota Fiscal (HTTP ${res.status}).`,
+      }
     }
 
     return { ok: true, data: json.data }
   } catch {
     return {
       ok: false,
-      error: 'Servidor indisponível para upload. Inicie a API (npm run server).',
+      error:
+        'Não foi possível enviar o arquivo. Verifique a conexão e tente de novo.',
     }
   }
 }

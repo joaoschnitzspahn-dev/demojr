@@ -20,7 +20,24 @@ const isProd = process.env.NODE_ENV === 'production'
 const app = express()
 
 app.use(cors())
-app.use(express.json({ limit: '16mb' }))
+app.use(express.json({ limit: '25mb' }))
+
+app.use((err, _req, res, next) => {
+  if (
+    err?.type === 'entity.parse.failed' ||
+    (err instanceof SyntaxError && 'body' in err)
+  ) {
+    return res
+      .status(400)
+      .json({ ok: false, error: 'JSON inválido no corpo da requisição.' })
+  }
+  if (err?.type === 'entity.too.large') {
+    return res
+      .status(413)
+      .json({ ok: false, error: 'Arquivo ou payload muito grande.' })
+  }
+  return next(err)
+})
 
 app.get('/api/health', async (_req, res) => {
   const dbInfo = await getDatabaseInfo()
