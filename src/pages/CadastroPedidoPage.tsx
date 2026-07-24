@@ -13,17 +13,25 @@ import { PRODUCT_OPTIONS } from '@/constants/products'
 import type { ProductType } from '@/types/workflow'
 
 const schema = z.object({
-  client: z.string().min(2, 'Informe o nome do cliente.'),
-  cpf: z.string().min(11, 'Informe o CPF.'),
-  email: z.string().email('Informe um e-mail válido.'),
-  phone: z.string().min(8, 'Informe o telefone.'),
-  product: z.enum(['mini_rastreador', 'lv12_4g'], {
-    message: 'Selecione o produto.',
-  }),
+  client: z.string().trim().min(2, 'Informe o nome do cliente.'),
+  cpf: z
+    .string()
+    .trim()
+    .min(1, 'Informe o CPF.')
+    .refine((v) => v.replace(/\D/g, '').length >= 11, {
+      message: 'CPF deve ter pelo menos 11 dígitos.',
+    }),
+  email: z.string().trim().email('Informe um e-mail válido.'),
+  phone: z.string().trim().min(8, 'Informe o telefone.'),
+  product: z.enum(['mini_rastreador', 'lv12_4g']),
   deviceQuantity: z
-    .number({ error: 'Informe a quantidade de aparelhos.' })
-    .int('Informe um número inteiro.')
-    .min(1, 'Informe a quantidade de aparelhos.'),
+    .string()
+    .trim()
+    .min(1, 'Informe a quantidade de aparelhos.')
+    .refine((v) => {
+      const n = Number(v)
+      return Number.isInteger(n) && n >= 1
+    }, 'Informe um número inteiro maior que zero.'),
   prontosoftOrderNumber: z.string().optional(),
   observations: z.string().optional(),
 })
@@ -47,36 +55,55 @@ export default function CadastroPedidoPage() {
       email: '',
       phone: '',
       product: 'mini_rastreador',
-      deviceQuantity: 1,
+      deviceQuantity: '1',
       prontosoftOrderNumber: '',
       observations: '',
     },
   })
 
   async function onSubmit(values: FormValues) {
-    const result = await createOrder({
-      client: values.client,
-      cpf: values.cpf,
-      email: values.email,
-      phone: values.phone,
-      product: values.product as ProductType,
-      observations: values.observations ?? '',
-      deviceQuantity: values.deviceQuantity,
-      prontosoftOrderNumber: values.prontosoftOrderNumber ?? '',
-    })
+    try {
+      const result = await createOrder({
+        client: values.client,
+        cpf: values.cpf,
+        email: values.email,
+        phone: values.phone,
+        product: values.product as ProductType,
+        observations: values.observations ?? '',
+        deviceQuantity: Math.max(1, Math.floor(Number(values.deviceQuantity) || 1)),
+        prontosoftOrderNumber: values.prontosoftOrderNumber ?? '',
+      })
 
-    if (!result.ok) {
+      if (!result.ok) {
+        toast.error(
+          'Pedido criado com aviso',
+          result.error ?? 'Não gravou no servidor. Verifique a conexão.'
+        )
+      } else {
+        toast.success(
+          'Pedido criado',
+          `Salvo no banco · iniciado por ${currentUser?.name ?? 'usuário'}.`
+        )
+      }
+      navigate('/')
+    } catch (e) {
       toast.error(
-        'Pedido criado com aviso',
-        result.error ?? 'Não gravou no servidor. Verifique a conexão.'
-      )
-    } else {
-      toast.success(
-        'Pedido criado',
-        `Salvo no banco · iniciado por ${currentUser?.name ?? 'usuário'}.`
+        'Erro ao criar pedido',
+        e instanceof Error ? e.message : 'Tente novamente.'
       )
     }
-    navigate('/')
+  }
+
+  function onInvalid(formErrors: typeof errors) {
+    const first =
+      formErrors.client?.message ||
+      formErrors.cpf?.message ||
+      formErrors.email?.message ||
+      formErrors.phone?.message ||
+      formErrors.deviceQuantity?.message ||
+      formErrors.product?.message ||
+      'Preencha os campos obrigatórios (nome, CPF, e-mail, telefone e quantidade).'
+    toast.error('Não foi possível salvar', first)
   }
 
   return (
@@ -96,7 +123,11 @@ export default function CadastroPedidoPage() {
           <CardTitle>Dados do pedido</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={handleSubmit(onSubmit, onInvalid)}
+            className="space-y-4"
+            noValidate
+          >
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
                 Nome do cliente
@@ -193,7 +224,7 @@ export default function CadastroPedidoPage() {
                 type="number"
                 min={1}
                 step={1}
-                {...register('deviceQuantity', { valueAsNumber: true })}
+                {...register('deviceQuantity')}
               />
               {errors.deviceQuantity ? (
                 <p className="mt-1.5 text-xs text-[var(--danger)]">
