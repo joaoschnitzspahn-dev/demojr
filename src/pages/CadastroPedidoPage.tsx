@@ -1,6 +1,4 @@
-import { useForm } from 'react-hook-form'
-import { z } from 'zod'
-import { zodResolver } from '@hookform/resolvers/zod'
+import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,98 +10,122 @@ import { useAuthStore } from '@/store/authStore'
 import { PRODUCT_OPTIONS } from '@/constants/products'
 import type { ProductType } from '@/types/workflow'
 
-const schema = z.object({
-  client: z.string().trim().min(2, 'Informe o nome do cliente.'),
-  cpf: z
-    .string()
-    .trim()
-    .min(1, 'Informe o CPF.')
-    .refine((v) => v.replace(/\D/g, '').length >= 11, {
-      message: 'CPF deve ter pelo menos 11 dígitos.',
-    }),
-  email: z.string().trim().email('Informe um e-mail válido.'),
-  phone: z.string().trim().min(8, 'Informe o telefone.'),
-  product: z.enum(['mini_rastreador', 'lv12_4g']),
-  deviceQuantity: z
-    .string()
-    .trim()
-    .min(1, 'Informe a quantidade de aparelhos.')
-    .refine((v) => {
-      const n = Number(v)
-      return Number.isInteger(n) && n >= 1
-    }, 'Informe um número inteiro maior que zero.'),
-  prontosoftOrderNumber: z.string().optional(),
-  observations: z.string().optional(),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormState = {
+  client: string
+  cpf: string
+  email: string
+  phone: string
+  product: ProductType
+  deviceQuantity: string
+  prontosoftOrderNumber: string
+  observations: string
+}
 
 export default function CadastroPedidoPage() {
   const navigate = useNavigate()
   const createOrder = useOrdersStore((s) => s.createOrder)
   const currentUser = useAuthStore((s) => s.currentUser)
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      client: '',
-      cpf: '',
-      email: '',
-      phone: '',
-      product: 'mini_rastreador',
-      deviceQuantity: '1',
-      prontosoftOrderNumber: '',
-      observations: '',
-    },
+  const [form, setForm] = React.useState<FormState>({
+    client: '',
+    cpf: '',
+    email: '',
+    phone: '',
+    product: 'mini_rastreador',
+    deviceQuantity: '1',
+    prontosoftOrderNumber: '',
+    observations: '',
   })
+  const [error, setError] = React.useState<string | null>(null)
+  const [saving, setSaving] = React.useState(false)
+  const clientRef = React.useRef<HTMLInputElement>(null)
 
-  async function onSubmit(values: FormValues) {
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+    setError(null)
+  }
+
+  function validate(): string | null {
+    if (form.client.trim().length < 2) {
+      return 'Informe o nome do cliente.'
+    }
+    if (form.cpf.replace(/\D/g, '').length < 11) {
+      return 'CPF deve ter pelo menos 11 dígitos.'
+    }
+    if (!form.email.trim() || !form.email.includes('@')) {
+      return 'Informe um e-mail válido.'
+    }
+    if (form.phone.trim().length < 8) {
+      return 'Informe o telefone.'
+    }
+    const qty = Number(form.deviceQuantity)
+    if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty < 1) {
+      return 'Informe a quantidade de aparelhos (número inteiro ≥ 1).'
+    }
+    return null
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      toast.error('Não foi possível salvar', validationError)
+      if (validationError.includes('nome')) {
+        clientRef.current?.focus()
+        clientRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      }
+      return
+    }
+
+    if (!currentUser) {
+      const msg = 'Sessão expirada. Faça login novamente.'
+      setError(msg)
+      toast.error('Sessão expirada', msg)
+      navigate('/login')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
     try {
       const result = await createOrder({
-        client: values.client,
-        cpf: values.cpf,
-        email: values.email,
-        phone: values.phone,
-        product: values.product as ProductType,
-        observations: values.observations ?? '',
-        deviceQuantity: Math.max(1, Math.floor(Number(values.deviceQuantity) || 1)),
-        prontosoftOrderNumber: values.prontosoftOrderNumber ?? '',
+        client: form.client.trim(),
+        cpf: form.cpf.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        product: form.product,
+        observations: form.observations.trim(),
+        deviceQuantity: Math.max(
+          1,
+          Math.floor(Number(form.deviceQuantity) || 1)
+        ),
+        prontosoftOrderNumber: form.prontosoftOrderNumber.trim(),
       })
 
       if (!result.ok) {
         toast.error(
           'Pedido criado com aviso',
-          result.error ?? 'Não gravou no servidor. Verifique a conexão.'
+          result.error ?? 'Não gravou no servidor.'
         )
       } else {
-        toast.success(
-          'Pedido criado',
-          `Salvo no banco · iniciado por ${currentUser?.name ?? 'usuário'}.`
-        )
+        toast.success('Pedido criado', `Salvo no banco · ${currentUser.name}`)
       }
       navigate('/')
-    } catch (e) {
-      toast.error(
-        'Erro ao criar pedido',
-        e instanceof Error ? e.message : 'Tente novamente.'
-      )
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Erro inesperado ao criar pedido.'
+      setError(msg)
+      toast.error('Erro ao criar pedido', msg)
+    } finally {
+      setSaving(false)
     }
-  }
-
-  function onInvalid(formErrors: typeof errors) {
-    const first =
-      formErrors.client?.message ||
-      formErrors.cpf?.message ||
-      formErrors.email?.message ||
-      formErrors.phone?.message ||
-      formErrors.deviceQuantity?.message ||
-      formErrors.product?.message ||
-      'Preencha os campos obrigatórios (nome, CPF, e-mail, telefone e quantidade).'
-    toast.error('Não foi possível salvar', first)
   }
 
   return (
@@ -123,75 +145,63 @@ export default function CadastroPedidoPage() {
           <CardTitle>Dados do pedido</CardTitle>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={handleSubmit(onSubmit, onInvalid)}
-            className="space-y-4"
-            noValidate
-          >
+          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--danger)]">
+                {error}
+              </div>
+            ) : null}
+
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
-                Nome do cliente
+                Nome do cliente <span className="text-[var(--danger)]">*</span>
               </label>
               <Input
+                ref={clientRef}
                 className="mt-1.5"
                 placeholder="Ex.: Mariana Souza"
-                {...register('client')}
+                value={form.client}
+                onChange={(e) => update('client', e.target.value)}
+                autoComplete="name"
               />
-              {errors.client ? (
-                <p className="mt-1.5 text-xs text-[var(--danger)]">
-                  {errors.client.message}
-                </p>
-              ) : null}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium text-[var(--text-h)]">
-                  CPF
+                  CPF <span className="text-[var(--danger)]">*</span>
                 </label>
                 <Input
                   className="mt-1.5"
                   placeholder="000.000.000-00"
-                  {...register('cpf')}
+                  value={form.cpf}
+                  onChange={(e) => update('cpf', e.target.value)}
                 />
-                {errors.cpf ? (
-                  <p className="mt-1.5 text-xs text-[var(--danger)]">
-                    {errors.cpf.message}
-                  </p>
-                ) : null}
               </div>
               <div>
                 <label className="text-xs font-medium text-[var(--text-h)]">
-                  Telefone
+                  Telefone <span className="text-[var(--danger)]">*</span>
                 </label>
                 <Input
                   className="mt-1.5"
                   placeholder="(00) 00000-0000"
-                  {...register('phone')}
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
                 />
-                {errors.phone ? (
-                  <p className="mt-1.5 text-xs text-[var(--danger)]">
-                    {errors.phone.message}
-                  </p>
-                ) : null}
               </div>
             </div>
 
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
-                E-mail
+                E-mail <span className="text-[var(--danger)]">*</span>
               </label>
               <Input
                 className="mt-1.5"
                 type="email"
                 placeholder="cliente@email.com"
-                {...register('email')}
+                value={form.email}
+                onChange={(e) => update('email', e.target.value)}
               />
-              {errors.email ? (
-                <p className="mt-1.5 text-xs text-[var(--danger)]">
-                  {errors.email.message}
-                </p>
-              ) : null}
             </div>
 
             <div>
@@ -202,48 +212,39 @@ export default function CadastroPedidoPage() {
                 className="mt-1.5"
                 placeholder="PS-2026-00000"
                 autoComplete="off"
-                {...register('prontosoftOrderNumber')}
+                value={form.prontosoftOrderNumber}
+                onChange={(e) => update('prontosoftOrderNumber', e.target.value)}
               />
-              {errors.prontosoftOrderNumber ? (
-                <p className="mt-1.5 text-xs text-[var(--danger)]">
-                  {errors.prontosoftOrderNumber.message}
-                </p>
-              ) : (
-                <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
-                  Opcional agora · obrigatório antes de concluir Cadastro
-                </p>
-              )}
+              <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                Opcional agora · obrigatório antes de concluir Cadastro
+              </p>
             </div>
 
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
-                Quantidade de aparelhos
+                Quantidade de aparelhos{' '}
+                <span className="text-[var(--danger)]">*</span>
               </label>
               <Input
                 className="mt-1.5"
                 type="number"
                 min={1}
                 step={1}
-                {...register('deviceQuantity')}
+                value={form.deviceQuantity}
+                onChange={(e) => update('deviceQuantity', e.target.value)}
               />
-              {errors.deviceQuantity ? (
-                <p className="mt-1.5 text-xs text-[var(--danger)]">
-                  {errors.deviceQuantity.message}
-                </p>
-              ) : (
-                <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
-                  Obrigatório · visível em todo o fluxo do pedido
-                </p>
-              )}
             </div>
 
             <div>
               <label className="text-xs font-medium text-[var(--text-h)]">
-                Produto
+                Produto <span className="text-[var(--danger)]">*</span>
               </label>
               <select
                 className="mt-1.5 flex h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-h)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                {...register('product')}
+                value={form.product}
+                onChange={(e) =>
+                  update('product', e.target.value as ProductType)
+                }
               >
                 {PRODUCT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -251,11 +252,6 @@ export default function CadastroPedidoPage() {
                   </option>
                 ))}
               </select>
-              {errors.product ? (
-                <p className="mt-1.5 text-xs text-[var(--danger)]">
-                  {errors.product.message}
-                </p>
-              ) : null}
               <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
                 Mini Rastreador inclui automaticamente o processo de Renovação.
               </p>
@@ -268,19 +264,20 @@ export default function CadastroPedidoPage() {
               <Textarea
                 className="mt-1.5"
                 placeholder="Observações do pedido"
-                {...register('observations')}
+                value={form.observations}
+                onChange={(e) => update('observations', e.target.value)}
               />
             </div>
 
             <div className="flex items-center gap-2 pt-1">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Criando...' : 'Salvar pedido'}
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Criando...' : 'Salvar pedido'}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/')}
-                disabled={isSubmitting}
+                disabled={saving}
               >
                 Cancelar
               </Button>
