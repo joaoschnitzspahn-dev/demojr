@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { seedMockOrders } from '@/mock/ordersMock'
 import { createOrder } from '@/services/orderService'
 import {
   activateRenovacaoIfDue,
@@ -31,6 +30,7 @@ import {
 } from '@/services/finishedOrdersApi'
 import {
   deleteOrderOnServer,
+  fetchAllOrders,
   saveOrderToServer,
   syncAllOrders,
 } from '@/services/ordersApi'
@@ -124,7 +124,13 @@ function mergeAllOrders(
 
 function persistOrderRemote(order: Order) {
   void saveOrderToServer(order).then((result) => {
-    if (result.ok && order.completedAt) {
+    if (!result.ok) {
+      console.warn('[Sistema Infra] Falha ao salvar pedido no servidor:', result.error)
+      useOrdersStore.setState({ serverOnline: false })
+      return
+    }
+    useOrdersStore.setState({ serverOnline: true })
+    if (order.completedAt) {
       void saveFinishedOrder(order)
     }
   })
@@ -135,6 +141,7 @@ type OrdersState = {
   deletedFinishedOrderIds: string[]
   loading: boolean
   seeded: boolean
+  hydrated: boolean
   syncingFinished: boolean
   serverOnline: boolean | null
   lastAutoSyncAt: string | null
@@ -157,7 +164,7 @@ type OrdersState = {
     observations: string
     deviceQuantity: number
     prontosoftOrderNumber: string
-  }) => void
+  }) => Promise<{ ok: boolean; error?: string }>
 
   attachInvoice: (input: {
     orderId: string
@@ -218,6 +225,7 @@ export const useOrdersStore = create<OrdersState>()(
       deletedFinishedOrderIds: [],
       loading: false,
       seeded: false,
+      hydrated: false,
       syncingFinished: false,
       serverOnline: null,
       lastAutoSyncAt: null,
@@ -226,18 +234,28 @@ export const useOrdersStore = create<OrdersState>()(
       drawerOpen: false,
 
       initialize: async () => {
-        if (get().seeded) {
-          set((s) => ({ orders: refreshOrders(s.orders) }))
-          await get().syncFinishedFromServer()
-          return
+        set({ loading: true })
+
+        // Nunca zerar pedidos locais — mescla com o servidor.
+        const local = refreshOrders(get().orders)
+        set({ orders: local, seeded: true })
+
+        const remote = await fetchAllOrders()
+        if (remote.ok && remote.data) {
+          const merged = refreshOrders(
+            mergeAllOrders(
+              local,
+              remote.data,
+              get().deletedFinishedOrderIds ?? []
+            )
+          )
+          set({ orders: merged, serverOnline: true })
+        } else if (!remote.ok) {
+          set({ serverOnline: false })
         }
 
-        set({ loading: true })
-        await new Promise((r) => window.setTimeout(r, 650))
-
-        const orders = refreshOrders(seedMockOrders())
-        set({ orders, loading: false, seeded: true })
         await get().syncFinishedFromServer()
+        set({ loading: false })
       },
 
       syncFinishedFromServer: async () => {
@@ -326,9 +344,9 @@ export const useOrdersStore = create<OrdersState>()(
         set({ drawerOpen: false })
       },
 
-      createOrder: (input) => {
+      createOrder: async (input) => {
         const user = getSessionUser()
-        if (!user) return
+        if (!user) return { ok: false, error: 'Sessão expirada.' }
 
         const stateOrders = get().orders
         const max = stateOrders
@@ -354,7 +372,24 @@ export const useOrdersStore = create<OrdersState>()(
           selectedOrderId: newOrder.id,
           drawerOpen: true,
         }))
-        persistOrderRemote(newOrder)
+
+        const result = await saveOrderToServer(newOrder)
+        if (!result.ok) {
+          console.warn(
+            '[Sistema Infra] Pedido criado localmente, mas não gravou no servidor:',
+            result.error
+          )
+          set({ serverOnline: false })
+          return {
+            ok: false,
+            error:
+              result.error ??
+              'Pedido ficou só neste navegador. Servidor não gravou.',
+          }
+        }
+
+        set({ serverOnline: true })
+        return { ok: true }
       },
 
       toggleChecklistItem: ({ orderId, stageId, itemId, checked }) => {
@@ -704,13 +739,35 @@ export const useOrdersStore = create<OrdersState>()(
         get().orders.filter((o) => Boolean(o.completedAt)),
     }),
     {
-      name: 'orders-workflow-v6',
+      name: 'orders-workflow-v7',
       partialize: (state) => ({
         orders: state.orders,
         seeded: state.seeded,
         deletedFinishedOrderIds: state.deletedFinishedOrderIds,
         lastAutoSyncAt: state.lastAutoSyncAt,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.hydrated = true
+        } else {
+          queueMicrotask(() => {
+            useOrdersStore.setState({ hydrated: true })
+          })
+        }
+      },
     }
   )
 )
+
+if (typeof window !== 'undefined') {
+  const markHydrated = () => {
+    if (!useOrdersStore.getState().hydrated) {
+      useOrdersStore.setState({ hydrated: true })
+    }
+  }
+  if (useOrdersStore.persist.hasHydrated()) {
+    markHydrated()
+  } else {
+    useOrdersStore.persist.onFinishHydration(markHydrated)
+  }
+}

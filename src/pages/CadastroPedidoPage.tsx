@@ -53,8 +53,8 @@ export default function CadastroPedidoPage() {
     },
   })
 
-  function onSubmit(values: FormValues) {
-    createOrder({
+  async function onSubmit(values: FormValues) {
+    const result = await createOrder({
       client: values.client,
       cpf: values.cpf,
       email: values.email,
@@ -64,10 +64,18 @@ export default function CadastroPedidoPage() {
       deviceQuantity: values.deviceQuantity,
       prontosoftOrderNumber: values.prontosoftOrderNumber ?? '',
     })
-    toast.success(
-      'Pedido criado',
-      `Cadastro iniciado por ${currentUser?.name ?? 'usuário'}.`
-    )
+
+    if (!result.ok) {
+      toast.error(
+        'Pedido criado com aviso',
+        result.error ?? 'Não gravou no servidor. Verifique a conexão.'
+      )
+    } else {
+      toast.success(
+        'Pedido criado',
+        `Salvo no banco · iniciado por ${currentUser?.name ?? 'usuário'}.`
+      )
+    }
     navigate('/')
   }
 
