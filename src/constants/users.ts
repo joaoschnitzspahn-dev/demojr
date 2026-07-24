@@ -34,23 +34,78 @@ export const DEFAULT_OPERATOR: AppUser = {
   createdAt: new Date(0).toISOString(),
 }
 
-/** Operador restrito apenas ao processo Expedição. */
-export const DEFAULT_EXPEDICAO: AppUser = {
-  id: 'user-operator-expedicao',
-  login: EXPEDICAO_LOGIN,
-  password: EXPEDICAO_PASSWORD,
-  name: 'Expedição',
-  role: 'operator',
-  assignedStages: [3],
-  active: true,
-  createdAt: new Date(0).toISOString(),
-}
+/**
+ * Operadores da equipe (login minúsculo, senha 123).
+ * Observação: o workflow atual possui processos 1–7.
+ * Rodrigo foi pedido para o processo 8 (ainda inexistente) — conta criada sem etapa.
+ */
+export const TEAM_OPERATORS: AppUser[] = [
+  {
+    id: 'user-operator-kemellyn',
+    login: 'kemellyn',
+    password: '123',
+    name: 'Kemellyn',
+    role: 'operator',
+    assignedStages: [1, 5, 7],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-josi',
+    login: 'josi',
+    password: '123',
+    name: 'Josi',
+    role: 'operator',
+    assignedStages: [2],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-expedicao',
+    login: EXPEDICAO_LOGIN,
+    password: EXPEDICAO_PASSWORD,
+    name: 'Expedição',
+    role: 'operator',
+    assignedStages: [3],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-sara',
+    login: 'sara',
+    password: '123',
+    name: 'Sara',
+    role: 'operator',
+    assignedStages: [4, 6],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-rodrigo',
+    login: 'rodrigo',
+    password: '123',
+    name: 'Rodrigo',
+    role: 'operator',
+    // Processo 8 ainda não existe no sistema — sem atribuição até definição.
+    assignedStages: [],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+]
 
-/** Seed inicial: admin + operadores. */
+/** @deprecated use TEAM_OPERATORS find expedicao */
+export const DEFAULT_EXPEDICAO =
+  TEAM_OPERATORS.find((u) => u.login === EXPEDICAO_LOGIN)!
+
+const TEAM_BY_LOGIN = new Map(
+  TEAM_OPERATORS.map((u) => [u.login.toLowerCase(), u])
+)
+
+/** Seed inicial: admin + infra + equipe. */
 export const SEED_USERS: AppUser[] = [
   DEFAULT_ADMIN,
   DEFAULT_OPERATOR,
-  DEFAULT_EXPEDICAO,
+  ...TEAM_OPERATORS,
 ]
 
 /** Nome padrão para seeds/mocks. */
@@ -105,16 +160,17 @@ export function normalizeAppUser(user: AppUser): AppUser {
     }
   }
 
-  if (user.login.toLowerCase() === EXPEDICAO_LOGIN.toLowerCase()) {
+  const teamSeed = TEAM_BY_LOGIN.get(user.login.toLowerCase())
+  if (teamSeed) {
     return {
-      ...DEFAULT_EXPEDICAO,
+      ...teamSeed,
       ...user,
-      id: user.id || DEFAULT_EXPEDICAO.id,
-      login: EXPEDICAO_LOGIN,
-      password: user.password || EXPEDICAO_PASSWORD,
-      name: user.name?.trim() || DEFAULT_EXPEDICAO.name,
+      id: user.id || teamSeed.id,
+      login: teamSeed.login,
+      password: user.password || teamSeed.password,
+      name: user.name?.trim() || teamSeed.name,
       role: 'operator',
-      assignedStages: [3],
+      assignedStages: [...teamSeed.assignedStages],
       active: user.active ?? true,
     }
   }

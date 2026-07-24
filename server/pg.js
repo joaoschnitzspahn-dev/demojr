@@ -86,14 +86,18 @@ export async function initDatabase() {
     ON orders (updated_at DESC);
   `)
 
-  // Seeds admin + infra + expedicao
+  // Seeds admin + infra + equipe operacional
   await query(
     `
     INSERT INTO users (id, login, password, name, role, assigned_stages, active, created_at, data)
     VALUES
-      ($1, $2, $3, $4, $5, $6::jsonb, TRUE, to_timestamp(0), $7::jsonb),
-      ($8, $9, $10, $11, $12, $13::jsonb, TRUE, to_timestamp(0), $14::jsonb),
-      ($15, $16, $17, $18, $19, $20::jsonb, TRUE, to_timestamp(0), $21::jsonb)
+      ($1, $2, $3, $4, $5, $6::jsonb, TRUE, to_timestamp(0), '{}'::jsonb),
+      ($7, $8, $9, $10, $11, $12::jsonb, TRUE, to_timestamp(0), '{}'::jsonb),
+      ($13, $14, $15, $16, $17, $18::jsonb, TRUE, to_timestamp(0), '{}'::jsonb),
+      ($19, $20, $21, $22, $23, $24::jsonb, TRUE, to_timestamp(0), '{}'::jsonb),
+      ($25, $26, $27, $28, $29, $30::jsonb, TRUE, to_timestamp(0), '{}'::jsonb),
+      ($31, $32, $33, $34, $35, $36::jsonb, TRUE, to_timestamp(0), '{}'::jsonb),
+      ($37, $38, $39, $40, $41, $42::jsonb, TRUE, to_timestamp(0), '{}'::jsonb)
     ON CONFLICT (login) DO NOTHING;
   `,
     [
@@ -103,21 +107,42 @@ export async function initDatabase() {
       'Administrador Master',
       'admin',
       JSON.stringify([1, 2, 3, 4, 5, 6, 7]),
-      JSON.stringify({}),
       'user-operator-infra',
       'infra',
       'infra123',
       'Infra',
       'operator',
       JSON.stringify([1, 2, 3, 4, 5, 6, 7]),
-      JSON.stringify({}),
+      'user-operator-kemellyn',
+      'kemellyn',
+      '123',
+      'Kemellyn',
+      'operator',
+      JSON.stringify([1, 5, 7]),
+      'user-operator-josi',
+      'josi',
+      '123',
+      'Josi',
+      'operator',
+      JSON.stringify([2]),
       'user-operator-expedicao',
       'expedicao',
       '123',
       'Expedição',
       'operator',
       JSON.stringify([3]),
-      JSON.stringify({}),
+      'user-operator-sara',
+      'sara',
+      '123',
+      'Sara',
+      'operator',
+      JSON.stringify([4, 6]),
+      'user-operator-rodrigo',
+      'rodrigo',
+      '123',
+      'Rodrigo',
+      'operator',
+      JSON.stringify([]),
     ]
   )
 

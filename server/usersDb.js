@@ -31,18 +31,60 @@ const DEFAULT_OPERATOR = {
   createdAt: new Date(0).toISOString(),
 }
 
-const DEFAULT_EXPEDICAO = {
-  id: 'user-operator-expedicao',
-  login: 'expedicao',
-  password: '123',
-  name: 'Expedição',
-  role: 'operator',
-  assignedStages: [3],
-  active: true,
-  createdAt: new Date(0).toISOString(),
-}
+const TEAM_OPERATORS = [
+  {
+    id: 'user-operator-kemellyn',
+    login: 'kemellyn',
+    password: '123',
+    name: 'Kemellyn',
+    role: 'operator',
+    assignedStages: [1, 5, 7],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-josi',
+    login: 'josi',
+    password: '123',
+    name: 'Josi',
+    role: 'operator',
+    assignedStages: [2],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-expedicao',
+    login: 'expedicao',
+    password: '123',
+    name: 'Expedição',
+    role: 'operator',
+    assignedStages: [3],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-sara',
+    login: 'sara',
+    password: '123',
+    name: 'Sara',
+    role: 'operator',
+    assignedStages: [4, 6],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+  {
+    id: 'user-operator-rodrigo',
+    login: 'rodrigo',
+    password: '123',
+    name: 'Rodrigo',
+    role: 'operator',
+    assignedStages: [],
+    active: true,
+    createdAt: new Date(0).toISOString(),
+  },
+]
 
-const SEED_USERS = [DEFAULT_ADMIN, DEFAULT_OPERATOR, DEFAULT_EXPEDICAO]
+const SEED_USERS = [DEFAULT_ADMIN, DEFAULT_OPERATOR, ...TEAM_OPERATORS]
 
 function ensureUsersDb() {
   const dir = path.dirname(USERS_DB_PATH)
@@ -106,26 +148,27 @@ function ensureSeedUsers(users) {
     )
   }
 
-  const hasExpedicao = next.some(
-    (u) => String(u.login).toLowerCase() === 'expedicao'
-  )
-  if (!hasExpedicao) {
-    next = [...next, DEFAULT_EXPEDICAO]
-  } else {
-    next = next.map((u) =>
-      String(u.login).toLowerCase() === 'expedicao'
-        ? {
-            ...DEFAULT_EXPEDICAO,
-            ...u,
-            login: 'expedicao',
-            password: u.password || DEFAULT_EXPEDICAO.password,
-            name: u.name || DEFAULT_EXPEDICAO.name,
-            role: 'operator',
-            assignedStages: [3],
-            active: u.active !== false,
-          }
-        : u
-    )
+  for (const teamUser of TEAM_OPERATORS) {
+    const login = teamUser.login.toLowerCase()
+    const hasUser = next.some((u) => String(u.login).toLowerCase() === login)
+    if (!hasUser) {
+      next = [...next, teamUser]
+    } else {
+      next = next.map((u) =>
+        String(u.login).toLowerCase() === login
+          ? {
+              ...teamUser,
+              ...u,
+              login: teamUser.login,
+              password: u.password || teamUser.password,
+              name: u.name || teamUser.name,
+              role: 'operator',
+              assignedStages: [...teamUser.assignedStages],
+              active: u.active !== false,
+            }
+          : u
+      )
+    }
   }
 
   return next

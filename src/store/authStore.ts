@@ -2,11 +2,11 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   DEFAULT_ADMIN,
-  DEFAULT_EXPEDICAO,
   DEFAULT_OPERATOR,
   isAdminUser,
   normalizeAppUser,
   SEED_USERS,
+  TEAM_OPERATORS,
 } from '@/constants/users'
 import {
   fetchUsersFromServer,
@@ -48,13 +48,20 @@ function mergeUsers(localUsers: AppUser[], remoteUsers: AppUser[]): AppUser[] {
     withAdmin.push(DEFAULT_OPERATOR)
   }
 
-  if (!withAdmin.some((u) => u.login.toLowerCase() === 'expedicao')) {
-    withAdmin.push(DEFAULT_EXPEDICAO)
+  for (const teamUser of TEAM_OPERATORS) {
+    const login = teamUser.login.toLowerCase()
+    if (!withAdmin.some((u) => u.login.toLowerCase() === login)) {
+      withAdmin.push(teamUser)
+    }
   }
 
   return withAdmin.map((u) => {
     const login = u.login.toLowerCase()
-    if (login === 'infra' || login === 'expedicao' || isAdminUser(u)) {
+    if (
+      login === 'infra' ||
+      TEAM_OPERATORS.some((t) => t.login === login) ||
+      isAdminUser(u)
+    ) {
       return normalizeAppUser(u)
     }
     return u
@@ -247,7 +254,7 @@ export const useAuthStore = create<AuthState>()(
           state.users = mergeUsers(state.users.map(normalizeAppUser), [
             DEFAULT_ADMIN,
             DEFAULT_OPERATOR,
-            DEFAULT_EXPEDICAO,
+            ...TEAM_OPERATORS,
           ])
 
           if (state.currentUser) {
