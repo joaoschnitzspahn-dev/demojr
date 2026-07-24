@@ -107,8 +107,8 @@ export default function PedidosFinalizadosPage() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
             Arquivo central de pedidos concluídos. Sincronização automática a
-            cada 10 horas — Penha, Argentina ou qualquer lugar, a lista é a
-            mesma.
+            cada 10 horas. Somente o administrador (adm) pode excluir pedidos
+            finalizados.
           </p>
           <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
             {syncingFinished ? (

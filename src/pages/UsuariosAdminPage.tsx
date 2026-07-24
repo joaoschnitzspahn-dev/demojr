@@ -2,14 +2,19 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, UserPlus } from 'lucide-react'
+import { KeyRound, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/authStore'
-import { WORKFLOW_STAGE_ORDER, WORKFLOW_STAGES, getStageTitle } from '@/constants/workflowStages'
-import type { WorkflowStageId } from '@/types/workflow'
+import {
+  WORKFLOW_STAGE_ORDER,
+  WORKFLOW_STAGES,
+  getStageTitle,
+} from '@/constants/workflowStages'
+import { isAdminUser } from '@/constants/users'
+import type { AppUser, WorkflowStageId } from '@/types/workflow'
 import { toast } from '@/components/ui/toast'
 import { formatDate } from '@/utils/date'
 import { cn } from '@/utils/cn'
@@ -17,7 +22,7 @@ import { cn } from '@/utils/cn'
 const schema = z.object({
   name: z.string().min(2, 'Informe o nome.'),
   login: z.string().min(2, 'Informe o login.'),
-  password: z.string().min(4, 'Senha com no mínimo 4 caracteres.'),
+  password: z.string().min(3, 'Senha com no mínimo 3 caracteres.'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -32,17 +37,27 @@ function stageLabel(stageId: WorkflowStageId) {
 
 export default function UsuariosAdminPage() {
   const users = useAuthStore((s) => s.users)
+  const currentUser = useAuthStore((s) => s.currentUser)
   const createUser = useAuthStore((s) => s.createUser)
   const updateUserStages = useAuthStore((s) => s.updateUserStages)
+  const updateUserCredentials = useAuthStore((s) => s.updateUserCredentials)
   const toggleUserActive = useAuthStore((s) => s.toggleUserActive)
 
   const [showForm, setShowForm] = useState(false)
   const [assignedStages, setAssignedStages] = useState<WorkflowStageId[]>([])
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingStagesId, setEditingStagesId] = useState<string | null>(null)
   const [editStages, setEditStages] = useState<WorkflowStageId[]>([])
+  const [editingCredsId, setEditingCredsId] = useState<string | null>(null)
+  const [credName, setCredName] = useState('')
+  const [credLogin, setCredLogin] = useState('')
+  const [credPassword, setCredPassword] = useState('')
 
   const operators = useMemo(
     () => users.filter((u) => u.role === 'operator'),
+    [users]
+  )
+  const adminUser = useMemo(
+    () => users.find((u) => isAdminUser(u)) ?? null,
     [users]
   )
 
@@ -66,6 +81,29 @@ export default function UsuariosAdminPage() {
     } else {
       setter([...list, stageId])
     }
+  }
+
+  function openCredentialsEditor(user: AppUser) {
+    setEditingStagesId(null)
+    setEditingCredsId(user.id)
+    setCredName(user.name)
+    setCredLogin(user.login)
+    setCredPassword(user.password)
+  }
+
+  function saveCredentials(userId: string) {
+    const result = updateUserCredentials({
+      userId,
+      name: credName,
+      login: credLogin,
+      password: credPassword,
+    })
+    if (!result.ok) {
+      toast.error('Não foi possível salvar', result.error)
+      return
+    }
+    toast.success('Login e senha atualizados')
+    setEditingCredsId(null)
   }
 
   function onSubmit(values: FormValues) {
@@ -96,7 +134,8 @@ export default function UsuariosAdminPage() {
             Usuários & atribuições
           </h1>
           <p className="mt-1 max-w-xl text-sm text-[var(--text-muted)]">
-            Crie operadores e defina em quais processos cada um pode atuar.
+            Apenas o administrador ({currentUser?.login ?? 'adm'}) pode criar
+            operadores, editar login/senha e excluir pedidos finalizados.
           </p>
         </div>
 
@@ -105,6 +144,67 @@ export default function UsuariosAdminPage() {
           {showForm ? 'Fechar' : 'Criar usuário'}
         </Button>
       </div>
+
+      {adminUser ? (
+        <Card className="mt-6 border-[var(--accent-border)]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <KeyRound className="h-4 w-4 text-[var(--accent)]" />
+              Administrador
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-[var(--text)]">
+              {adminUser.name} · login fixo <span className="font-mono">adm</span>
+            </p>
+            {editingCredsId === adminUser.id ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-[var(--text-h)]">
+                    Nome
+                  </label>
+                  <Input
+                    className="mt-1.5"
+                    value={credName}
+                    onChange={(e) => setCredName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[var(--text-h)]">
+                    Nova senha
+                  </label>
+                  <Input
+                    className="mt-1.5"
+                    type="password"
+                    value={credPassword}
+                    onChange={(e) => setCredPassword(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 sm:col-span-2">
+                  <Button size="sm" onClick={() => saveCredentials(adminUser.id)}>
+                    Salvar senha
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditingCredsId(null)}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openCredentialsEditor(adminUser)}
+              >
+                Alterar senha do adm
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showForm ? (
         <Card className="mt-6">
@@ -118,13 +218,9 @@ export default function UsuariosAdminPage() {
                   <label className="text-xs font-medium text-[var(--text-h)]">
                     Nome
                   </label>
-                  <Input
-                    className="mt-1.5"
-                    placeholder="João Silva"
-                    {...register('name')}
-                  />
+                  <Input className="mt-1.5" {...register('name')} />
                   {errors.name ? (
-                    <p className="mt-1 text-xs text-[var(--danger)]">
+                    <p className="mt-1.5 text-xs text-[var(--danger)]">
                       {errors.name.message}
                     </p>
                   ) : null}
@@ -135,11 +231,11 @@ export default function UsuariosAdminPage() {
                   </label>
                   <Input
                     className="mt-1.5"
-                    placeholder="joao"
+                    autoComplete="off"
                     {...register('login')}
                   />
                   {errors.login ? (
-                    <p className="mt-1 text-xs text-[var(--danger)]">
+                    <p className="mt-1.5 text-xs text-[var(--danger)]">
                       {errors.login.message}
                     </p>
                   ) : null}
@@ -151,11 +247,11 @@ export default function UsuariosAdminPage() {
                   <Input
                     className="mt-1.5"
                     type="password"
-                    placeholder="••••••••"
+                    autoComplete="new-password"
                     {...register('password')}
                   />
                   {errors.password ? (
-                    <p className="mt-1 text-xs text-[var(--danger)]">
+                    <p className="mt-1.5 text-xs text-[var(--danger)]">
                       {errors.password.message}
                     </p>
                   ) : null}
@@ -163,10 +259,10 @@ export default function UsuariosAdminPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-[var(--text-h)]">
-                  Etapas que pode executar
-                </label>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <p className="mb-2 text-xs font-medium text-[var(--text-h)]">
+                  Processos permitidos
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {WORKFLOW_STAGE_ORDER.map((stageId) => {
                     const selected = assignedStages.includes(stageId)
                     return (
@@ -177,26 +273,20 @@ export default function UsuariosAdminPage() {
                           toggleStage(assignedStages, stageId, setAssignedStages)
                         }
                         className={cn(
-                          'rounded-lg border px-3 py-2 text-left text-xs transition-colors',
+                          'rounded-lg border px-3 py-2 text-left text-xs',
                           selected
                             ? 'border-[var(--accent-border)] bg-[var(--accent-bg)] text-[var(--accent)]'
-                            : 'border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text)] hover:bg-[var(--bg-muted)]'
+                            : 'border-[var(--border)] text-[var(--text)]'
                         )}
                       >
-                        <div className="font-medium">
-                          {stageId}. {stageLabel(stageId)}
-                        </div>
+                        {stageId}. {stageLabel(stageId)}
                       </button>
                     )
                   })}
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                disabled={isSubmitting || assignedStages.length === 0}
-              >
-                <Plus className="h-3.5 w-3.5" />
+              <Button type="submit" disabled={isSubmitting}>
                 Salvar usuário
               </Button>
             </form>
@@ -236,10 +326,10 @@ export default function UsuariosAdminPage() {
                       {user.assignedStages
                         .filter((sid) => WORKFLOW_STAGES[sid])
                         .map((sid) => (
-                        <Badge key={sid} variant="accent">
-                          {sid}. {stageLabel(sid)}
-                        </Badge>
-                      ))}
+                          <Badge key={sid} variant="accent">
+                            {sid}. {stageLabel(sid)}
+                          </Badge>
+                        ))}
                     </div>
                   </div>
 
@@ -247,16 +337,28 @@ export default function UsuariosAdminPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => openCredentialsEditor(user)}
+                    >
+                      {editingCredsId === user.id
+                        ? 'Fechar login/senha'
+                        : 'Editar login/senha'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => {
-                        if (editingId === user.id) {
-                          setEditingId(null)
+                        setEditingCredsId(null)
+                        if (editingStagesId === user.id) {
+                          setEditingStagesId(null)
                           return
                         }
-                        setEditingId(user.id)
+                        setEditingStagesId(user.id)
                         setEditStages([...user.assignedStages])
                       }}
                     >
-                      {editingId === user.id ? 'Cancelar' : 'Editar etapas'}
+                      {editingStagesId === user.id
+                        ? 'Cancelar etapas'
+                        : 'Editar etapas'}
                     </Button>
                     <Button
                       variant="secondary"
@@ -273,7 +375,53 @@ export default function UsuariosAdminPage() {
                   </div>
                 </div>
 
-                {editingId === user.id ? (
+                {editingCredsId === user.id ? (
+                  <div className="mt-4 space-y-3 border-t border-[var(--border)] pt-4">
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Somente o administrador pode alterar login e senha.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="text-xs font-medium text-[var(--text-h)]">
+                          Nome
+                        </label>
+                        <Input
+                          className="mt-1.5"
+                          value={credName}
+                          onChange={(e) => setCredName(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-[var(--text-h)]">
+                          Login
+                        </label>
+                        <Input
+                          className="mt-1.5"
+                          value={credLogin}
+                          onChange={(e) => setCredLogin(e.target.value)}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-[var(--text-h)]">
+                          Senha
+                        </label>
+                        <Input
+                          className="mt-1.5"
+                          type="password"
+                          value={credPassword}
+                          onChange={(e) => setCredPassword(e.target.value)}
+                          autoComplete="new-password"
+                        />
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => saveCredentials(user.id)}>
+                      Salvar login e senha
+                    </Button>
+                  </div>
+                ) : null}
+
+                {editingStagesId === user.id ? (
                   <div className="mt-4 border-t border-[var(--border)] pt-4">
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                       {WORKFLOW_STAGE_ORDER.map((stageId) => {
@@ -307,7 +455,7 @@ export default function UsuariosAdminPage() {
                           return
                         }
                         toast.success('Etapas atualizadas')
-                        setEditingId(null)
+                        setEditingStagesId(null)
                       }}
                     >
                       Salvar atribuições

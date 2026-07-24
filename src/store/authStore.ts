@@ -88,6 +88,13 @@ type AuthState = {
     assignedStages: WorkflowStageId[]
   ) => { ok: boolean; error?: string }
 
+  updateUserCredentials: (input: {
+    userId: string
+    login: string
+    password: string
+    name?: string
+  }) => { ok: boolean; error?: string }
+
   toggleUserActive: (userId: string) => void
 
   syncUsersFromServer: () => Promise<{ ok: boolean; error?: string }>
@@ -201,6 +208,64 @@ export const useAuthStore = create<AuthState>()(
             : u
         )
         set({ users })
+        void syncUsersToServer(users)
+        return { ok: true }
+      },
+
+      updateUserCredentials: ({ userId, login, password, name }) => {
+        const current = get().currentUser
+        if (!current || !isAdminUser(current)) {
+          return {
+            ok: false,
+            error: 'Apenas o administrador pode editar login e senha.',
+          }
+        }
+
+        const normalized = login.trim().toLowerCase()
+        const pass = password.trim()
+        if (!normalized || !pass) {
+          return { ok: false, error: 'Informe login e senha.' }
+        }
+        if (pass.length < 3) {
+          return { ok: false, error: 'Senha com no mínimo 3 caracteres.' }
+        }
+
+        const target = get().users.find((u) => u.id === userId)
+        if (!target) {
+          return { ok: false, error: 'Usuário não encontrado.' }
+        }
+
+        // Login do admin master permanece fixo.
+        if (isAdminUser(target) && normalized !== 'adm') {
+          return {
+            ok: false,
+            error: 'O login do administrador master deve permanecer "adm".',
+          }
+        }
+
+        const conflict = get().users.some(
+          (u) => u.id !== userId && u.login.toLowerCase() === normalized
+        )
+        if (conflict) {
+          return { ok: false, error: 'Já existe um usuário com este login.' }
+        }
+
+        const users = get().users.map((u) => {
+          if (u.id !== userId) return u
+          return normalizeAppUser({
+            ...u,
+            login: isAdminUser(u) ? 'adm' : normalized,
+            password: pass,
+            name: name?.trim() || u.name,
+          })
+        })
+
+        const nextCurrent =
+          current.id === userId
+            ? users.find((u) => u.id === userId) ?? current
+            : current
+
+        set({ users, currentUser: nextCurrent })
         void syncUsersToServer(users)
         return { ok: true }
       },

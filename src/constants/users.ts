@@ -158,17 +158,25 @@ export function normalizeAppUser(user: AppUser): AppUser {
     }
   }
 
-  const teamSeed = TEAM_BY_LOGIN.get(user.login.toLowerCase())
+  const teamSeed =
+    TEAM_BY_LOGIN.get(user.login.toLowerCase()) ||
+    TEAM_OPERATORS.find((t) => t.id === user.id)
+
   if (teamSeed) {
+    const stages =
+      Array.isArray(user.assignedStages) && user.assignedStages.length > 0
+        ? user.assignedStages.filter((s) => validStages.includes(s))
+        : [...teamSeed.assignedStages]
+
     return {
       ...teamSeed,
       ...user,
       id: user.id || teamSeed.id,
-      login: teamSeed.login,
+      login: (user.login || teamSeed.login).trim().toLowerCase(),
       password: user.password || teamSeed.password,
       name: user.name?.trim() || teamSeed.name,
       role: 'operator',
-      assignedStages: [...teamSeed.assignedStages],
+      assignedStages: stages,
       active: user.active ?? true,
     }
   }

@@ -150,20 +150,30 @@ function ensureSeedUsers(users) {
 
   for (const teamUser of TEAM_OPERATORS) {
     const login = teamUser.login.toLowerCase()
-    const hasUser = next.some((u) => String(u.login).toLowerCase() === login)
-    if (!hasUser) {
+    const existing = next.find(
+      (u) =>
+        String(u.id) === teamUser.id ||
+        String(u.login).toLowerCase() === login
+    )
+    if (!existing) {
       next = [...next, teamUser]
     } else {
       next = next.map((u) =>
-        String(u.login).toLowerCase() === login
+        String(u.id) === existing.id
           ? {
               ...teamUser,
               ...u,
-              login: teamUser.login,
+              id: u.id || teamUser.id,
+              login: String(u.login || teamUser.login)
+                .trim()
+                .toLowerCase(),
               password: u.password || teamUser.password,
               name: u.name || teamUser.name,
               role: 'operator',
-              assignedStages: [...teamUser.assignedStages],
+              assignedStages:
+                Array.isArray(u.assignedStages) && u.assignedStages.length > 0
+                  ? u.assignedStages
+                  : [...teamUser.assignedStages],
               active: u.active !== false,
             }
           : u
