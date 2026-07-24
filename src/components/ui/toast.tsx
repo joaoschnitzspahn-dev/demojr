@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/utils/cn'
+import { createId } from '@/utils/id'
 
 type ToastVariant = 'success' | 'error' | 'info'
 
@@ -19,13 +20,13 @@ function emit(toast: ToastItem) {
 
 export const toast = {
   success: (title: string, description?: string) => {
-    emit({ id: crypto.randomUUID(), variant: 'success', title, description })
+    emit({ id: createId(), variant: 'success', title, description })
   },
   error: (title: string, description?: string) => {
-    emit({ id: crypto.randomUUID(), variant: 'error', title, description })
+    emit({ id: createId(), variant: 'error', title, description })
   },
   info: (title: string, description?: string) => {
-    emit({ id: crypto.randomUUID(), variant: 'info', title, description })
+    emit({ id: createId(), variant: 'info', title, description })
   },
 }
 

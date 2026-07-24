@@ -12,6 +12,7 @@ import type {
   StageProgress,
   WorkflowStageId,
 } from '@/types/workflow'
+import { createId } from '@/utils/id'
 
 function buildChecklistItems(stageId: WorkflowStageId): ChecklistItem[] {
   return WORKFLOW_STAGES[stageId].checklistTemplate.map((t) => ({
@@ -84,7 +85,7 @@ export function createOrder({
   const qty = Math.max(1, Math.floor(Number(deviceQuantity) || 1))
 
   const order: Order = {
-    id: crypto.randomUUID(),
+    id: createId(),
     number,
     client,
     cpf,
@@ -110,7 +111,7 @@ export function createOrder({
     reminders: [],
     history: [
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         orderId: '',
         type: 'created',
         stageId: startStageId,
@@ -121,7 +122,7 @@ export function createOrder({
         notes: '',
       },
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         orderId: '',
         type: 'started',
         stageId: startStageId,

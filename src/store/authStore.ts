@@ -13,6 +13,7 @@ import {
   syncUsersToServer,
 } from '@/services/usersApi'
 import type { AppUser, WorkflowStageId } from '@/types/workflow'
+import { createId } from '@/utils/id'
 
 function mergeUsers(localUsers: AppUser[], remoteUsers: AppUser[]): AppUser[] {
   const byLogin = new Map<string, AppUser>()
@@ -174,7 +175,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         const newUser: AppUser = {
-          id: crypto.randomUUID(),
+          id: createId(),
           login: normalized,
           password: pass,
           name: name.trim(),

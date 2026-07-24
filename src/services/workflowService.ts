@@ -18,6 +18,7 @@ import type {
   StageState,
   WorkflowStageId,
 } from '@/types/workflow'
+import { createId } from '@/utils/id'
 
 export class WorkflowError extends Error {
   constructor(message: string) {
@@ -29,7 +30,7 @@ export class WorkflowError extends Error {
 function createHistoryEvent(
   partial: Omit<OrderHistoryEvent, 'id'>
 ): OrderHistoryEvent {
-  return { id: crypto.randomUUID(), ...partial }
+  return { id: createId(), ...partial }
 }
 
 function addDays(iso: string, days: number) {
@@ -512,7 +513,7 @@ export function completeStage({
     }
 
     updatedOrder.reminders.push({
-      id: crypto.randomUUID(),
+      id: createId(),
       type: 'renovacao_5m',
       stageId: 7,
       dueAt,
@@ -582,7 +583,7 @@ export function completeStage({
   if (operationalNext === 6) {
     const dueAt = addDays(occurredAt, 7)
     updatedOrder.reminders.push({
-      id: crypto.randomUUID(),
+      id: createId(),
       type: 'pos_venda_7d',
       stageId: 6,
       dueAt,
