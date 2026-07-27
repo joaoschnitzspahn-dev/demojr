@@ -11,13 +11,14 @@ import {
   getOrderStatus as computeOrderStatus,
   migrateWorkflowOrder,
   recordStockDebitHistory,
+  setOrderDeliveryMethod,
   syncChecklistsWithTemplates,
   toggleChecklistItem,
   updateOrderShippingFields,
   updateProntosoftOrderNumber,
   updateStageObservations,
 } from '@/services/workflowService'
-import type { InvoiceAttachment } from '@/types/workflow'
+import type { DeliveryMethod, InvoiceAttachment } from '@/types/workflow'
 import { canUserWorkOnStage, isAdminUser } from '@/constants/users'
 import { useAuthStore } from '@/store/authStore'
 import { useStockStore } from '@/store/stockStore'
@@ -188,6 +189,11 @@ type OrdersState = {
     orderId: string
     trackingCode?: string
     imeis?: string
+  }) => { ok: boolean; error?: string }
+
+  setDeliveryMethod: (input: {
+    orderId: string
+    deliveryMethod: DeliveryMethod
   }) => { ok: boolean; error?: string }
 
   importImeisFromSpreadsheet: (input: {
@@ -478,6 +484,42 @@ export const useOrdersStore = create<OrdersState>()(
         }
       },
 
+      setDeliveryMethod: ({ orderId, deliveryMethod }) => {
+        const user = getSessionUser()
+        if (!user) return { ok: false, error: 'Sessão expirada.' }
+        if (!canUserWorkOnStage(user, 2)) {
+          return {
+            ok: false,
+            error: 'Você não tem permissão para atuar neste processo.',
+          }
+        }
+
+        const state = get()
+        const idx = state.orders.findIndex((o) => o.id === orderId)
+        if (idx === -1) return { ok: false, error: 'Pedido não encontrado.' }
+
+        try {
+          const nextOrder = setOrderDeliveryMethod({
+            order: state.orders[idx],
+            deliveryMethod,
+            operatorId: user.name,
+          })
+          const orders = [...state.orders]
+          orders[idx] = nextOrder
+          set({ orders })
+          persistOrderRemote(nextOrder)
+          return { ok: true }
+        } catch (e) {
+          return {
+            ok: false,
+            error:
+              e instanceof Error
+                ? e.message
+                : 'Erro ao definir forma de entrega.',
+          }
+        }
+      },
+
       importImeisFromSpreadsheet: ({ orderId, imeis, fileName }) => {
         const user = getSessionUser()
         if (!user) return { ok: false, error: 'Sessão expirada.' }
@@ -611,8 +653,10 @@ export const useOrdersStore = create<OrdersState>()(
                 ? 'Informe o número do pedido na Prontosoft no checklist.'
                 : order.currentStageId === 2 && !order.invoiceAttachment
                   ? 'Anexe a Nota Fiscal.'
-                  : order.currentStageId === 2 && !order.trackingCode.trim()
-                    ? 'Informe o código de rastreio.'
+                  : order.currentStageId === 2 &&
+                      order.deliveryMethod !== 'store_pickup' &&
+                      !order.trackingCode.trim()
+                    ? 'Informe o código de rastreio (ou marque retirada na loja).'
                     : 'Checklist obrigatório incompleto.',
           }
         }

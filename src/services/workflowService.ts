@@ -9,6 +9,7 @@ import { PRODUCT_LABELS, requiresRenovacao } from '@/constants/products'
 import { OPERADOR_FICTICIO } from '@/constants/users'
 import type {
   ChecklistItem,
+  DeliveryMethod,
   InvoiceAttachment,
   Order,
   OrderAlert,
@@ -19,6 +20,25 @@ import type {
   WorkflowStageId,
 } from '@/types/workflow'
 import { createId } from '@/utils/id'
+
+/** Itens de checklist da etapa 2 ligados a envio (dispensados na retirada). */
+const STAGE2_SHIPPING_ITEM_IDS = new Set(['gerar_etiqueta', 'rastreio'])
+
+export function isStorePickup(order: Pick<Order, 'deliveryMethod'>): boolean {
+  return order.deliveryMethod === 'store_pickup'
+}
+
+export function isShippingWaivedItem(
+  order: Pick<Order, 'deliveryMethod'>,
+  stageId: WorkflowStageId,
+  itemId: string
+): boolean {
+  return (
+    isStorePickup(order) &&
+    stageId === 2 &&
+    STAGE2_SHIPPING_ITEM_IDS.has(itemId)
+  )
+}
 
 export class WorkflowError extends Error {
   constructor(message: string) {
@@ -75,6 +95,7 @@ export function migrateWorkflowOrder(order: Order): Order {
     return {
       ...order,
       deviceQuantity: order.deviceQuantity ?? 1,
+      deliveryMethod: order.deliveryMethod ?? 'shipping',
       invoiceAttachment: order.invoiceAttachment ?? null,
       lastActivityAt:
         order.lastActivityAt ??
@@ -155,6 +176,7 @@ export function migrateWorkflowOrder(order: Order): Order {
   return {
     ...order,
     deviceQuantity: order.deviceQuantity ?? 1,
+    deliveryMethod: order.deliveryMethod ?? 'shipping',
     invoiceAttachment: order.invoiceAttachment ?? null,
     lastActivityAt:
       order.lastActivityAt ??
@@ -172,11 +194,22 @@ export function getRequiredChecklistItems(stage: { checklist: ChecklistItem[] })
   return stage.checklist.filter((i) => i.required)
 }
 
+export function getEffectiveRequiredItems(
+  order: Pick<Order, 'deliveryMethod'>,
+  stage: { stageId: WorkflowStageId; checklist: ChecklistItem[] }
+) {
+  return stage.checklist.filter((i) => {
+    if (!i.required) return false
+    if (isShippingWaivedItem(order, stage.stageId, i.id)) return false
+    return true
+  })
+}
+
 export function isChecklistComplete(
+  order: Pick<Order, 'deliveryMethod'>,
   stageProgress: NonNullable<Order['stages'][WorkflowStageId]>
 ) {
-  const requiredItems = getRequiredChecklistItems(stageProgress)
-  return requiredItems.every((i) => i.checked)
+  return getEffectiveRequiredItems(order, stageProgress).every((i) => i.checked)
 }
 
 export function ensureReminderStatuses(order: Order, now = new Date()): Order {
@@ -282,8 +315,14 @@ export function getCanCompleteStage(order: Order, stageId: WorkflowStageId) {
   if (!stage) return false
   if (stageId === 1 && !order.prontosoftOrderNumber.trim()) return false
   if (stageId === 2 && !order.invoiceAttachment) return false
-  if (stageId === 2 && !order.trackingCode.trim()) return false
-  return isChecklistComplete(stage)
+  if (
+    stageId === 2 &&
+    !isStorePickup(order) &&
+    !order.trackingCode.trim()
+  ) {
+    return false
+  }
+  return isChecklistComplete(order, stage)
 }
 
 export const getCanAdvanceStage = getCanCompleteStage
@@ -410,7 +449,7 @@ export function completeStage({
     throw new WorkflowError('Este processo já foi concluído e está bloqueado.')
   }
 
-  if (!isChecklistComplete(stageProgress)) {
+  if (!isChecklistComplete(order, stageProgress)) {
     throw new WorkflowError(
       'Checklist obrigatório incompleto. Não é possível concluir o processo.'
     )
@@ -422,7 +461,7 @@ export function completeStage({
     )
   }
 
-  if (stageId === 2 && !order.trackingCode.trim()) {
+  if (stageId === 2 && !isStorePickup(order) && !order.trackingCode.trim()) {
     throw new WorkflowError('Informe o código de rastreio antes de concluir.')
   }
 
@@ -536,7 +575,43 @@ export function completeStage({
   }
 
   // Fluxo operacional sequencial: 1 → 2 → 3 → 4 → 5 → 6
-  const operationalNext = (stageId + 1) as WorkflowStageId
+  // Retirada na loja: após Expedição (3) pula Acompanhamento da Entrega (4).
+  let operationalNext = (stageId + 1) as WorkflowStageId
+  if (stageId === 3 && isStorePickup(order)) {
+    operationalNext = 5
+
+    const deliveryStage = updatedOrder.stages[4]
+    if (deliveryStage && !deliveryStage.finishedAt) {
+      updatedOrder.stages[4] = {
+        ...deliveryStage,
+        startedAt: deliveryStage.startedAt ?? occurredAt,
+        finishedAt: occurredAt,
+        responsible: operatorId,
+        observations:
+          deliveryStage.observations?.trim() ||
+          'Etapa dispensada — retirada na loja.',
+        checklist: deliveryStage.checklist.map((item) => ({
+          ...item,
+          checked: true,
+        })),
+      }
+
+      const skippedEvent = createHistoryEvent({
+        orderId: order.id,
+        type: 'completed',
+        stageId: 4,
+        stageLabel: getStageTitle(4),
+        occurredAt,
+        responsible: operatorId,
+        message:
+          'Acompanhamento da Entrega dispensado (retirada na loja).',
+        notes: '',
+      })
+      events.push(skippedEvent)
+      updatedOrder.history.push(skippedEvent)
+    }
+  }
+
   const nextTitle = getStageTitle(operationalNext)
   const nextStageProgress = updatedOrder.stages[operationalNext]
 
@@ -697,6 +772,11 @@ export function updateOrderShippingFields({
       'Código de rastreio só pode ser editado na etapa Nota Fiscal e Etiqueta ativa.'
     )
   }
+  if (trackingCode !== undefined && isStorePickup(order)) {
+    throw new WorkflowError(
+      'Pedido marcado como retirada na loja — código de rastreio não se aplica.'
+    )
+  }
   if (imeis !== undefined && !canEditImeis) {
     throw new WorkflowError(
       'IMEIs só podem ser editados na Expedição ativa.'
@@ -744,6 +824,72 @@ export function updateOrderShippingFields({
     responsible: operatorId,
     message: `${operatorId} atualizou: ${changes.join(', ')}.`,
     notes: '',
+  })
+
+  return touchActivity(
+    { ...next, history: [...order.history, event] },
+    occurredAt
+  )
+}
+
+export function setOrderDeliveryMethod({
+  order,
+  deliveryMethod,
+  operatorId = OPERADOR_FICTICIO,
+}: {
+  order: Order
+  deliveryMethod: DeliveryMethod
+  operatorId?: OperatorId
+}): Order {
+  if (getStageState(order, 2) !== 'active') {
+    throw new WorkflowError(
+      'Forma de entrega só pode ser alterada na etapa Nota Fiscal e Etiqueta ativa.'
+    )
+  }
+
+  const current = order.deliveryMethod ?? 'shipping'
+  if (current === deliveryMethod) return order
+
+  const occurredAt = new Date().toISOString()
+  const next: Order = {
+    ...order,
+    deliveryMethod,
+    trackingCode:
+      deliveryMethod === 'store_pickup' ? '' : order.trackingCode,
+    stages: { ...order.stages },
+  }
+
+  const stage = next.stages[2]
+  if (stage) {
+    next.stages[2] = {
+      ...stage,
+      checklist: stage.checklist.map((item) => {
+        if (!STAGE2_SHIPPING_ITEM_IDS.has(item.id)) return item
+        return {
+          ...item,
+          checked: deliveryMethod === 'store_pickup',
+        }
+      }),
+    }
+  }
+
+  const label =
+    deliveryMethod === 'store_pickup'
+      ? 'Retirada na loja'
+      : 'Envio com rastreio'
+
+  const event = createHistoryEvent({
+    orderId: order.id,
+    type: 'field_updated',
+    stageId: 2,
+    stageLabel: getStageTitle(2),
+    occurredAt,
+    responsible: operatorId,
+    message: `${operatorId} definiu forma de entrega: ${label}.`,
+    notes:
+      deliveryMethod === 'store_pickup'
+        ? 'Código de rastreio e etiqueta de envio dispensados.'
+        : '',
   })
 
   return touchActivity(

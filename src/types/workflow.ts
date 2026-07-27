@@ -3,6 +3,9 @@ export type WorkflowStageId = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export type ProductType = 'mini_rastreador' | 'lv12_4g'
 
+/** Forma de entrega definida na etapa Nota Fiscal e Etiqueta. */
+export type DeliveryMethod = 'shipping' | 'store_pickup'
+
 export type OperatorId = string
 
 export type UserRole = 'admin' | 'operator'
@@ -117,12 +120,19 @@ export type Order = {
   /** Número do pedido no sistema Prontosoft. */
   prontosoftOrderNumber: string
 
-  /** Código de rastreio (preenchido na Nota Fiscal e Etiqueta). */
+  /** Código de rastreio (preenchido na Nota Fiscal e Etiqueta — só para envio). */
   trackingCode: string
   /** IMEIs informados na Expedição. */
   imeis: string
   /** Tags catalogadas. */
   tags: string
+
+  /**
+   * Forma de entrega.
+   * `store_pickup` dispensa código de rastreio, etiqueta de envio e
+   * o acompanhamento de entrega (etapa 4).
+   */
+  deliveryMethod: DeliveryMethod
 
   /** Nota Fiscal anexada no processo 2. */
   invoiceAttachment: InvoiceAttachment | null

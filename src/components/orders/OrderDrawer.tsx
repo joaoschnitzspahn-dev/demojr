@@ -17,6 +17,7 @@ import {
   getDueReminders,
   getOrderStatus,
   getStageState,
+  isStorePickup,
 } from '@/services/workflowService'
 import { canUserWorkOnStage } from '@/constants/users'
 import { WORKFLOW_STAGES } from '@/constants/workflowStages'
@@ -41,6 +42,7 @@ export default function OrderDrawer() {
     (s) => s.updateStageObservations
   )
   const updateShippingFields = useOrdersStore((s) => s.updateShippingFields)
+  const setDeliveryMethod = useOrdersStore((s) => s.setDeliveryMethod)
   const updateProntosoftNumber = useOrdersStore((s) => s.updateProntosoftNumber)
   const importImeisFromSpreadsheet = useOrdersStore(
     (s) => s.importImeisFromSpreadsheet
@@ -85,6 +87,7 @@ export default function OrderDrawer() {
     order?.currentStageId === 2 && stageState === 'active'
   const isExpedicao =
     order?.currentStageId === 3 && stageState === 'active'
+  const storePickup = order ? isStorePickup(order) : false
   const canViewInvoice = Boolean(order?.invoiceAttachment)
   const dueReminders = order ? getDueReminders(order) : []
 
@@ -241,9 +244,17 @@ export default function OrderDrawer() {
                 </CardHeader>
                 <CardContent className="space-y-0.5 text-xs text-[var(--text)]">
                   <div>
+                    Entrega:{' '}
+                    <span className="font-medium">
+                      {storePickup ? 'Retirada na loja' : 'Envio'}
+                    </span>
+                  </div>
+                  <div>
                     Rastreio:{' '}
                     <span className="font-mono">
-                      {order.trackingCode || '—'}
+                      {storePickup
+                        ? 'Não se aplica'
+                        : order.trackingCode || '—'}
                     </span>
                   </div>
                   <div>
@@ -276,12 +287,71 @@ export default function OrderDrawer() {
                   <CardTitle>Nota Fiscal</CardTitle>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {isNotaFiscal
-                      ? 'Anexe a Nota Fiscal e informe o código de rastreio (obrigatório para concluir).'
+                      ? storePickup
+                        ? 'Anexe a Nota Fiscal. Retirada na loja dispensa rastreio e etiqueta de envio.'
+                        : 'Anexe a Nota Fiscal e informe o código de rastreio (obrigatório para envio).'
                       : 'Anexo disponível em modo somente leitura.'}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {isNotaFiscal && !checklistDisabled ? (
+                    <div>
+                      <label className="text-xs font-medium text-[var(--text-h)]">
+                        Forma de entrega
+                      </label>
+                      <div className="mt-1.5 grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            !storePickup ? 'default' : 'outline'
+                          }
+                          onClick={() => {
+                            const result = setDeliveryMethod({
+                              orderId: order.id,
+                              deliveryMethod: 'shipping',
+                            })
+                            if (!result.ok && result.error) {
+                              toast.error('Ação bloqueada', result.error)
+                            }
+                          }}
+                        >
+                          Envio
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            storePickup ? 'default' : 'outline'
+                          }
+                          onClick={() => {
+                            const result = setDeliveryMethod({
+                              orderId: order.id,
+                              deliveryMethod: 'store_pickup',
+                            })
+                            if (!result.ok && result.error) {
+                              toast.error('Ação bloqueada', result.error)
+                              return
+                            }
+                            toast.success(
+                              'Retirada na loja',
+                              'Rastreio e etiqueta de envio dispensados.'
+                            )
+                          }}
+                        >
+                          Retirada na loja
+                        </Button>
+                      </div>
+                      {storePickup ? (
+                        <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+                          Também dispensa o Acompanhamento da Entrega após a
+                          Expedição.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {isNotaFiscal && !checklistDisabled && !storePickup ? (
                     <div>
                       <label className="text-xs font-medium text-[var(--text-h)]">
                         Código de rastreio
@@ -530,6 +600,12 @@ export default function OrderDrawer() {
                         items={stageProgress.checklist}
                         disabled={checklistDisabled}
                         prontosoftOrderNumber={order.prontosoftOrderNumber}
+                        waivedItemIds={
+                          storePickup && order.currentStageId === 2
+                            ? ['gerar_etiqueta', 'rastreio']
+                            : []
+                        }
+                        waivedHint="Dispensado — retirada na loja"
                         onProntosoftChange={(value) => {
                           const result = updateProntosoftNumber({
                             orderId: order.id,
@@ -639,8 +715,9 @@ export default function OrderDrawer() {
                         : order.currentStageId === 2 && !order.invoiceAttachment
                           ? 'Anexe a Nota Fiscal para concluir.'
                           : order.currentStageId === 2 &&
+                              !storePickup &&
                               !order.trackingCode.trim()
-                            ? 'Informe o código de rastreio para concluir.'
+                            ? 'Informe o código de rastreio ou marque retirada na loja.'
                             : 'Marque todos os itens obrigatórios para concluir.'}
                     </p>
                   ) : null}

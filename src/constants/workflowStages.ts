@@ -44,14 +44,19 @@ export const WORKFLOW_STAGES: Record<
   2: {
     id: 2,
     title: 'Nota Fiscal e Etiqueta',
-    description: 'Emitir NF, gerar etiqueta e anexar a Nota Fiscal.',
+    description:
+      'Emitir NF, anexar arquivo e definir envio ou retirada na loja.',
     checklistTemplate: [
       { id: 'emitir_nf', label: 'Emitir Nota Fiscal', required: true },
-      { id: 'gerar_etiqueta', label: 'Gerar Etiqueta', required: true },
+      {
+        id: 'gerar_etiqueta',
+        label: 'Gerar Etiqueta (somente envio)',
+        required: true,
+      },
       { id: 'conferir_docs', label: 'Conferir documentos', required: true },
       {
         id: 'rastreio',
-        label: 'Informar código de rastreio',
+        label: 'Informar código de rastreio (somente envio)',
         required: true,
       },
     ],

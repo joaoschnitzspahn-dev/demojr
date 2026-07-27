@@ -11,15 +11,24 @@ export default function StageChecklist({
   disabled,
   prontosoftOrderNumber = '',
   onProntosoftChange,
+  waivedItemIds = [],
+  waivedHint = 'Dispensado',
 }: {
   items: ChecklistItem[]
   onToggle: (itemId: string, checked: boolean) => void
   disabled?: boolean
   prontosoftOrderNumber?: string
   onProntosoftChange?: (value: string) => void
+  /** Itens dispensados (ex.: rastreio/etiqueta na retirada na loja). */
+  waivedItemIds?: string[]
+  waivedHint?: string
 }) {
-  const done = items.filter((i) => i.checked).length
-  const total = items.length
+  const waived = new Set(waivedItemIds)
+  const visibleItems = items
+  const done = visibleItems.filter(
+    (i) => i.checked || waived.has(i.id)
+  ).length
+  const total = visibleItems.length
 
   return (
     <div className="space-y-3">
@@ -36,9 +45,10 @@ export default function StageChecklist({
         />
       </div>
 
-      {items.map((it) => {
+      {visibleItems.map((it) => {
         const isProntosoft = it.id === PRONTOSOFT_ITEM_ID
         const linked = Boolean(prontosoftOrderNumber.trim())
+        const isWaived = waived.has(it.id)
 
         if (isProntosoft) {
           return (
@@ -82,6 +92,25 @@ export default function StageChecklist({
                     onChange={(e) => onProntosoftChange?.(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                   />
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        if (isWaived) {
+          return (
+            <div
+              key={it.id}
+              className="flex items-start gap-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-muted)]/50 px-3 py-2.5 opacity-80"
+            >
+              <Checkbox checked disabled className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm text-[var(--text-muted)] line-through">
+                  {it.label}
+                </div>
+                <div className="mt-0.5 text-[11px] font-medium text-[var(--accent)]">
+                  {waivedHint}
                 </div>
               </div>
             </div>

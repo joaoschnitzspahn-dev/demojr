@@ -98,6 +98,7 @@ export function createOrder({
     trackingCode: '',
     imeis: '',
     tags: '',
+    deliveryMethod: 'shipping',
     invoiceAttachment: null,
     lastActivityAt: iso,
     workflowVersion: CURRENT_WORKFLOW_VERSION,
