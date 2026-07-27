@@ -282,7 +282,7 @@ export function getCanCompleteStage(order: Order, stageId: WorkflowStageId) {
   if (!stage) return false
   if (stageId === 1 && !order.prontosoftOrderNumber.trim()) return false
   if (stageId === 2 && !order.invoiceAttachment) return false
-  if (stageId === 3 && !order.trackingCode.trim()) return false
+  if (stageId === 2 && !order.trackingCode.trim()) return false
   return isChecklistComplete(stage)
 }
 
@@ -422,7 +422,7 @@ export function completeStage({
     )
   }
 
-  if (stageId === 3 && !order.trackingCode.trim()) {
+  if (stageId === 2 && !order.trackingCode.trim()) {
     throw new WorkflowError('Informe o código de rastreio antes de concluir.')
   }
 
@@ -689,9 +689,17 @@ export function updateOrderShippingFields({
   imeis?: string
   operatorId?: OperatorId
 }): Order {
-  if (getStageState(order, 3) !== 'active') {
+  const canEditTracking = getStageState(order, 2) === 'active'
+  const canEditImeis = getStageState(order, 3) === 'active'
+
+  if (trackingCode !== undefined && !canEditTracking) {
     throw new WorkflowError(
-      'Código de rastreio e IMEIs só podem ser editados na Expedição ativa.'
+      'Código de rastreio só pode ser editado na etapa Nota Fiscal e Etiqueta ativa.'
+    )
+  }
+  if (imeis !== undefined && !canEditImeis) {
+    throw new WorkflowError(
+      'IMEIs só podem ser editados na Expedição ativa.'
     )
   }
 
@@ -707,28 +715,31 @@ export function updateOrderShippingFields({
     changes.push('IMEIs atualizados')
   }
 
-  const stage = next.stages[3]
-  if (stage && trackingCode !== undefined) {
-    const hasTracking = trackingCode.trim().length > 0
-    next.stages = {
-      ...next.stages,
-      3: {
-        ...stage,
-        checklist: stage.checklist.map((item) =>
-          item.id === 'rastreio' ? { ...item, checked: hasTracking } : item
-        ),
-      },
+  if (trackingCode !== undefined && canEditTracking) {
+    const stage = next.stages[2]
+    if (stage) {
+      const hasTracking = trackingCode.trim().length > 0
+      next.stages = {
+        ...next.stages,
+        2: {
+          ...stage,
+          checklist: stage.checklist.map((item) =>
+            item.id === 'rastreio' ? { ...item, checked: hasTracking } : item
+          ),
+        },
+      }
     }
   }
 
   if (changes.length === 0) return next
 
+  const stageId = trackingCode !== undefined ? 2 : 3
   const occurredAt = new Date().toISOString()
   const event = createHistoryEvent({
     orderId: order.id,
     type: 'field_updated',
-    stageId: 3,
-    stageLabel: getStageTitle(3),
+    stageId,
+    stageLabel: getStageTitle(stageId),
     occurredAt,
     responsible: operatorId,
     message: `${operatorId} atualizou: ${changes.join(', ')}.`,

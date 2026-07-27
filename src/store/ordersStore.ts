@@ -611,7 +611,7 @@ export const useOrdersStore = create<OrdersState>()(
                 ? 'Informe o número do pedido na Prontosoft no checklist.'
                 : order.currentStageId === 2 && !order.invoiceAttachment
                   ? 'Anexe a Nota Fiscal.'
-                  : order.currentStageId === 3 && !order.trackingCode.trim()
+                  : order.currentStageId === 2 && !order.trackingCode.trim()
                     ? 'Informe o código de rastreio.'
                     : 'Checklist obrigatório incompleto.',
           }

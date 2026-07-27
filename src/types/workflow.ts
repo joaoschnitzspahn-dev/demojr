@@ -117,7 +117,7 @@ export type Order = {
   /** Número do pedido no sistema Prontosoft. */
   prontosoftOrderNumber: string
 
-  /** Código de rastreio (preenchido na Expedição). */
+  /** Código de rastreio (preenchido na Nota Fiscal e Etiqueta). */
   trackingCode: string
   /** IMEIs informados na Expedição. */
   imeis: string

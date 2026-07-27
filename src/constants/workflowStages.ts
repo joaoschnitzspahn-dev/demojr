@@ -49,6 +49,11 @@ export const WORKFLOW_STAGES: Record<
       { id: 'emitir_nf', label: 'Emitir Nota Fiscal', required: true },
       { id: 'gerar_etiqueta', label: 'Gerar Etiqueta', required: true },
       { id: 'conferir_docs', label: 'Conferir documentos', required: true },
+      {
+        id: 'rastreio',
+        label: 'Informar código de rastreio',
+        required: true,
+      },
     ],
   },
   3: {
@@ -59,11 +64,6 @@ export const WORKFLOW_STAGES: Record<
       { id: 'imprimir', label: 'Imprimir pedido', required: true },
       { id: 'lacres', label: 'Retirar lacres', required: true },
       { id: 'embalar', label: 'Embalar para envio', required: true },
-      {
-        id: 'rastreio',
-        label: 'Informar código de rastreio',
-        required: true,
-      },
     ],
   },
   4: {

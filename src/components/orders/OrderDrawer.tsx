@@ -276,11 +276,33 @@ export default function OrderDrawer() {
                   <CardTitle>Nota Fiscal</CardTitle>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {isNotaFiscal
-                      ? 'Anexe o arquivo da Nota Fiscal (obrigatório para concluir).'
+                      ? 'Anexe a Nota Fiscal e informe o código de rastreio (obrigatório para concluir).'
                       : 'Anexo disponível em modo somente leitura.'}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {isNotaFiscal && !checklistDisabled ? (
+                    <div>
+                      <label className="text-xs font-medium text-[var(--text-h)]">
+                        Código de rastreio
+                      </label>
+                      <Input
+                        className="mt-1.5 font-mono"
+                        value={order.trackingCode}
+                        placeholder="Ex.: BR123456789ON"
+                        onChange={(e) => {
+                          const result = updateShippingFields({
+                            orderId: order.id,
+                            trackingCode: e.target.value,
+                          })
+                          if (!result.ok && result.error) {
+                            toast.error('Ação bloqueada', result.error)
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : null}
+
                   {order.invoiceAttachment ? (
                     <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-3">
                       <div className="flex items-start gap-2">
@@ -399,26 +421,6 @@ export default function OrderDrawer() {
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div>
-                        <label className="text-xs font-medium text-[var(--text-h)]">
-                          Código de rastreio
-                        </label>
-                        <Input
-                          className="mt-1.5 font-mono"
-                          value={order.trackingCode}
-                          disabled={checklistDisabled}
-                          placeholder="Ex.: BR123456789ON"
-                          onChange={(e) => {
-                            const result = updateShippingFields({
-                              orderId: order.id,
-                              trackingCode: e.target.value,
-                            })
-                            if (!result.ok && result.error) {
-                              toast.error('Ação bloqueada', result.error)
-                            }
-                          }}
-                        />
-                      </div>
                       <div>
                         <div className="flex items-center justify-between gap-2">
                           <label className="text-xs font-medium text-[var(--text-h)]">
@@ -636,7 +638,7 @@ export default function OrderDrawer() {
                         ? 'Você não tem permissão para concluir este processo.'
                         : order.currentStageId === 2 && !order.invoiceAttachment
                           ? 'Anexe a Nota Fiscal para concluir.'
-                          : order.currentStageId === 3 &&
+                          : order.currentStageId === 2 &&
                               !order.trackingCode.trim()
                             ? 'Informe o código de rastreio para concluir.'
                             : 'Marque todos os itens obrigatórios para concluir.'}

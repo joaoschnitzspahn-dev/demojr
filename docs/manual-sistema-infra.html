@@ -242,13 +242,13 @@
       <h1>Manual do Usuário</h1>
       <p class="subtitle">
         Guia prático para operar o sistema de gestão de pedidos:
-        cadastro, expedição, entrega, pós-venda e acompanhamento.
+        cadastro, nota fiscal, expedição, entrega, pós-venda e acompanhamento.
       </p>
       <div class="meta">
-        <div><strong>Documento:</strong> Manual do Cliente</div>
-        <div><strong>Versão:</strong> 1.0</div>
+        <div><strong>Documento:</strong> Manual do Usuário</div>
+        <div><strong>Versão:</strong> 1.1</div>
         <div><strong>Data:</strong> Julho/2026</div>
-        <div><strong>Público:</strong> Operadores e Administrador</div>
+        <div><strong>Público:</strong> Operadores</div>
       </div>
     </section>
 
@@ -266,39 +266,21 @@
       preenche os dados necessários e conclui a etapa para liberar a próxima.
     </div>
 
-    <h2>2. Acessos e login</h2>
-    <p>Na tela inicial, informe login e senha e clique em <strong>Entrar</strong>.</p>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Perfil</th>
-          <th>Login</th>
-          <th>Senha</th>
-          <th>O que pode fazer</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Administrador</strong></td>
-          <td><span class="kbd">adm</span></td>
-          <td><span class="kbd">adm123</span></td>
-          <td>Acesso total, criar usuários, excluir pedidos finalizados</td>
-        </tr>
-        <tr>
-          <td><strong>Operador</strong></td>
-          <td><span class="kbd">infra</span></td>
-          <td><span class="kbd">infra123</span></td>
-          <td>Executar todas as etapas do fluxo operacional</td>
-        </tr>
-      </tbody>
-    </table>
-
+    <h2>2. Como entrar</h2>
+    <p>
+      Na tela inicial, informe o <strong>login</strong> e a <strong>senha</strong>
+      fornecidos pelo administrador da operação e clique em <strong>Entrar</strong>.
+    </p>
     <div class="box warn">
       <div class="box-title">Importante</div>
-      O login é sempre em <strong>minúsculas</strong>. Exemplo: se o usuário
-      for João, use <span class="kbd">joao</span>.
-      Para sair, clique no ícone de saída no canto superior direito.
+      <ul style="margin-bottom:0">
+        <li>O login é sempre em <strong>minúsculas</strong> (ex.: joao).</li>
+        <li>Não compartilhe sua senha com outros usuários.</li>
+        <li>Para sair, clique no ícone de saída no canto superior direito.</li>
+        <li>
+          Se esquecer a senha, peça ao administrador para redefinir o acesso.
+        </li>
+      </ul>
     </div>
 
     <h2>3. Menu principal</h2>
@@ -315,12 +297,20 @@
           <td>Dashboard e Kanban dos pedidos em andamento</td>
         </tr>
         <tr>
+          <td><strong>Alertas</strong></td>
+          <td>Pedidos parados há mais de 15 minutos sem movimentação</td>
+        </tr>
+        <tr>
+          <td><strong>Estoque</strong></td>
+          <td>Consulta de aparelhos disponíveis (Mini Rastreador e LV-12 4G)</td>
+        </tr>
+        <tr>
           <td><strong>Finalizados</strong></td>
           <td>Arquivo de pedidos já concluídos, com busca</td>
         </tr>
         <tr>
           <td><strong>Usuários</strong></td>
-          <td>Somente admin: criar operadores e definir permissões</td>
+          <td>Somente administrador: criar operadores e definir permissões</td>
         </tr>
         <tr>
           <td><strong>Novo pedido</strong></td>
@@ -331,10 +321,13 @@
 
     <h2>4. Como criar um novo pedido</h2>
     <ol class="steps">
-      <li>Clique em <strong>Novo pedido</strong>.</li>
+      <li>Clique em <strong>Novo pedido</strong> (ou <strong>Cadastrar pedido</strong>).</li>
       <li>
         Preencha os dados do cliente:
         <strong>nome, CPF, telefone, e-mail</strong>.
+      </li>
+      <li>
+        Informe a <strong>quantidade de aparelhos</strong> (obrigatório).
       </li>
       <li>
         (Opcional) Informe o <strong>nº do pedido Prontosoft</strong>,
@@ -375,28 +368,33 @@
         </tr>
         <tr>
           <td>2</td>
+          <td><strong>Nota Fiscal e Etiqueta</strong></td>
+          <td>Emitir NF, gerar etiqueta e anexar o arquivo da Nota Fiscal</td>
+        </tr>
+        <tr>
+          <td>3</td>
           <td><strong>Expedição</strong></td>
           <td>Preparar envio, informar IMEIs e código de rastreio</td>
         </tr>
         <tr>
-          <td>3</td>
+          <td>4</td>
           <td><strong>Acompanhamento da Entrega</strong></td>
           <td>Monitorar Ontime, criar cerca e informar o cliente</td>
         </tr>
         <tr>
-          <td>4</td>
+          <td>5</td>
           <td><strong>Confirmação de Recebimento</strong></td>
           <td>Confirmar entrega, liberar tag e enviar apps/tutoriais</td>
         </tr>
         <tr>
-          <td>5</td>
+          <td>6</td>
           <td><strong>Pós-venda</strong></td>
           <td>Contato de acompanhamento e finalização do pedido</td>
         </tr>
         <tr>
-          <td>6</td>
+          <td>7</td>
           <td><strong>Renovação</strong></td>
-          <td>Somente Mini Rastreador — agendada para 5 meses</td>
+          <td>Somente Mini Rastreador — agendada para cerca de 5 meses</td>
         </tr>
       </tbody>
     </table>
@@ -413,7 +411,7 @@
       <li>Clique no card para abrir o <strong>painel lateral</strong>.</li>
       <li>Veja os dados do cliente, produto, Prontosoft, rastreio e histórico.</li>
       <li>Marque os itens do <strong>checklist</strong> da etapa ativa.</li>
-      <li>Preencha campos obrigatórios da etapa (ex.: Prontosoft, IMEIs, rastreio).</li>
+      <li>Preencha campos obrigatórios da etapa (ex.: Prontosoft, Nota Fiscal, rastreio).</li>
       <li>Quando tudo estiver ok, clique em <strong>Concluir etapa</strong>.</li>
       <li>O pedido avança automaticamente para a próxima coluna do Kanban.</li>
     </ol>
@@ -430,12 +428,27 @@
     </ul>
     <p>Sem esse número, a etapa de Cadastro <strong>não pode ser concluída</strong>.</p>
 
-    <h3>6.2 Expedição — IMEIs e planilha</h3>
+    <h3>6.2 Nota Fiscal e Etiqueta</h3>
+    <p>Nesta etapa, conclua o checklist e anexe o arquivo da Nota Fiscal:</p>
+    <ul>
+      <li>Marque: Emitir Nota Fiscal, Gerar Etiqueta e Conferir documentos.</li>
+      <li>
+        Clique em <strong>Upload da Nota Fiscal</strong> e envie PDF, XML ou imagem
+        (até 12 MB).
+      </li>
+      <li>Sem o anexo da NF, a etapa <strong>não pode ser concluída</strong>.</li>
+    </ul>
+
+    <h3>6.3 Expedição — IMEIs, rastreio e estoque</h3>
     <p>Na etapa de Expedição, use a seção <strong>Dados de expedição</strong>:</p>
     <ul>
       <li><strong>Código de rastreio</strong> — obrigatório para concluir a etapa</li>
       <li><strong>IMEIs</strong> — digite um por linha <em>ou</em> clique em
         <strong>Inserir por planilha</strong> (.xlsx, .xls ou .csv)</li>
+      <li>
+        Ao concluir, o sistema pode perguntar se deseja dar <strong>baixa no estoque</strong>
+        conforme a quantidade de aparelhos do pedido.
+      </li>
     </ul>
     <div class="box tip">
       <div class="box-title">Dica de planilha</div>
@@ -443,7 +456,20 @@
       de números. A importação preenche o campo automaticamente.
     </div>
 
-    <h2>7. Pedidos finalizados</h2>
+    <h2>7. Alertas de pedido parado</h2>
+    <p>
+      Se um pedido ficar sem movimentação por mais de <strong>15 minutos</strong>,
+      o sistema destaca o alerta no Dashboard e na tela <strong>Alertas</strong>.
+    </p>
+    <ul>
+      <li>Abra o pedido e avance a etapa o quanto antes.</li>
+      <li>
+        Se o navegador pedir, você pode <strong>ativar notificações do Chrome</strong>
+        na Central de Alertas (acesso pelo link seguro do sistema).
+      </li>
+    </ul>
+
+    <h2>8. Pedidos finalizados</h2>
     <p>
       Quando a etapa de <strong>Pós-venda</strong> é concluída, o pedido vai
       para <strong>Finalizados</strong>.
@@ -461,13 +487,13 @@
       </li>
     </ul>
 
-    <h2>8. Usuários (somente administrador)</h2>
-    <p>No menu <strong>Usuários</strong>, o admin pode:</p>
+    <h2>9. Usuários (somente administrador)</h2>
+    <p>No menu <strong>Usuários</strong>, o administrador pode:</p>
     <ul>
-      <li>criar operadores (nome, login, senha);</li>
+      <li>criar operadores (nome, login e senha);</li>
       <li>escolher quais etapas cada operador pode executar;</li>
       <li>ativar ou desativar um usuário;</li>
-      <li>editar as etapas atribuídas depois.</li>
+      <li>editar login, senha e etapas atribuídas depois.</li>
     </ul>
 
     <div class="box warn">
@@ -476,7 +502,7 @@
       o sistema bloqueia checklist e conclusão.
     </div>
 
-    <h2>9. Produtos e renovação</h2>
+    <h2>10. Produtos e renovação</h2>
     <table>
       <thead>
         <tr>
@@ -489,8 +515,8 @@
           <td><strong>Mini Rastreador</strong></td>
           <td>
             Após a confirmação de recebimento, a <strong>Renovação</strong>
-            é agendada para daqui a 5 meses. Quando chegar a data, a etapa
-            fica disponível.
+            é agendada para daqui a cerca de 5 meses. Quando chegar a data,
+            a etapa fica disponível (inclui desvincular Tag Ontime).
           </td>
         </tr>
         <tr>
@@ -500,16 +526,17 @@
       </tbody>
     </table>
 
-    <h2>10. Dicas rápidas do dia a dia</h2>
+    <h2>11. Dicas rápidas do dia a dia</h2>
     <ul>
       <li>Sempre conclua o checklist obrigatório antes de avançar.</li>
       <li>Use observações da etapa para registrar detalhes da operação.</li>
       <li>O histórico do pedido mostra quem iniciou e concluiu cada etapa.</li>
       <li>No Kanban, os cards mostram status e tempo na etapa atual.</li>
       <li>Em Finalizados, use a busca para localizar cliente rapidamente.</li>
+      <li>Confira o Estoque antes de grandes volumes de envio.</li>
     </ul>
 
-    <h2>11. Problemas comuns</h2>
+    <h2>12. Problemas comuns</h2>
     <table>
       <thead>
         <tr>
@@ -519,24 +546,31 @@
       </thead>
       <tbody>
         <tr>
-          <td>Não consigo entrar com o usuário</td>
+          <td>Não consigo entrar</td>
           <td>
-            Confirme login em minúsculas e a senha correta.
-            Saia da conta atual antes de trocar de usuário.
+            Confirme login em minúsculas e peça a senha ao administrador,
+            se necessário. Saia da conta atual antes de trocar de usuário.
           </td>
         </tr>
         <tr>
           <td>Botão “Concluir etapa” bloqueado</td>
           <td>
-            Verifique checklist incompleto, número Prontosoft (Cadastro)
-            ou código de rastreio (Expedição).
+            Verifique checklist incompleto, nº Prontosoft (Cadastro),
+            anexo da Nota Fiscal (etapa 2) ou código de rastreio (Expedição).
+          </td>
+        </tr>
+        <tr>
+          <td>Upload da Nota Fiscal falhou</td>
+          <td>
+            Use arquivo de até 12 MB (PDF, XML ou imagem) e atualize a página.
+            Se persistir, avise o suporte.
           </td>
         </tr>
         <tr>
           <td>Não consigo marcar o checklist</td>
           <td>
             Sua conta pode não ter permissão naquela etapa.
-            Peça ao admin para atribuir o processo.
+            Peça ao administrador para atribuir o processo.
           </td>
         </tr>
         <tr>
@@ -549,7 +583,7 @@
       </tbody>
     </table>
 
-    <h2>12. Contato de suporte</h2>
+    <h2>13. Contato de suporte</h2>
     <p>
       Em caso de dúvida operacional ou necessidade de ajuste no sistema,
       fale com o responsável pela implantação:
@@ -560,7 +594,7 @@
     </div>
 
     <div class="footer">
-      Sistema Infra — Manual do Usuário v1.0 · Documento destinado ao cliente final ·
+      Sistema Infra — Manual do Usuário v1.1 · Sem credenciais de acesso ·
       Uso interno da operação
     </div>
   </div>
