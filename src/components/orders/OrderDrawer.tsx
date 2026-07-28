@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { AlertTriangle, FileSpreadsheet, FileText, Loader2 } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, FileSpreadsheet, FileText, Loader2 } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,15 +55,18 @@ export default function OrderDrawer() {
   const [notes, setNotes] = React.useState('')
   const [importingSheet, setImportingSheet] = React.useState(false)
   const [uploadingInvoice, setUploadingInvoice] = React.useState(false)
+  const [showImeis, setShowImeis] = React.useState(false)
   const sheetInputRef = React.useRef<HTMLInputElement>(null)
   const invoiceInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     if (!drawerOpen || !order) {
       setNotes('')
+      setShowImeis(false)
       return
     }
     setNotes(order.stages[order.currentStageId]?.observations ?? '')
+    setShowImeis(false)
   }, [drawerOpen, order?.id, order?.currentStageId])
 
   const stageProgress = order
@@ -242,7 +245,7 @@ export default function OrderDrawer() {
                     Rastreio / IMEIs
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0.5 text-xs text-[var(--text)]">
+                <CardContent className="space-y-2 text-xs text-[var(--text)]">
                   <div>
                     Entrega:{' '}
                     <span className="font-medium">
@@ -257,14 +260,55 @@ export default function OrderDrawer() {
                         : order.trackingCode || '—'}
                     </span>
                   </div>
-                  <div>
-                    IMEIs:{' '}
-                    <span className="font-mono">
-                      {order.imeis.trim()
-                        ? `${order.imeis.trim().split(/\n+/).filter(Boolean).length} informado(s)`
-                        : '—'}
-                    </span>
-                  </div>
+                  {(() => {
+                    const imeiList = order.imeis
+                      .trim()
+                      .split(/\n+/)
+                      .map((v) => v.trim())
+                      .filter(Boolean)
+                    if (imeiList.length === 0) {
+                      return (
+                        <div>
+                          IMEIs: <span className="font-mono">—</span>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            IMEIs:{' '}
+                            <span className="font-mono">
+                              {imeiList.length} informado(s)
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-[11px]"
+                            onClick={() => setShowImeis((v) => !v)}
+                          >
+                            {showImeis ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                            {showImeis ? 'Ocultar' : 'Ver IMEIs'}
+                          </Button>
+                        </div>
+                        {showImeis ? (
+                          <ul className="rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-2.5 font-mono text-[11px] leading-relaxed">
+                            {imeiList.map((imei) => (
+                              <li key={imei} className="break-all">
+                                {imei}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    )
+                  })()}
                 </CardContent>
               </Card>
               <Card className="sm:col-span-2">
