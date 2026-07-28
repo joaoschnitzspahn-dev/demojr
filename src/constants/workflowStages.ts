@@ -86,12 +86,6 @@ export const WORKFLOW_STAGES: Record<
         label: 'Criar cerca Ontime',
         required: true,
       },
-      { id: 'informar', label: 'Informar o cliente', required: true },
-      {
-        id: 'confirmar_rastreio',
-        label: 'Confirmar envio do código de rastreio',
-        required: true,
-      },
       {
         id: 'cidade_cliente',
         label:
@@ -108,6 +102,12 @@ export const WORKFLOW_STAGES: Record<
       {
         id: 'recebimento',
         label: 'Confirmar recebimento pelo cliente',
+        required: true,
+      },
+      { id: 'informar', label: 'Informar o cliente', required: true },
+      {
+        id: 'confirmar_rastreio',
+        label: 'Confirmar envio do código de rastreio',
         required: true,
       },
       {
