@@ -1,11 +1,12 @@
 import {
   CURRENT_WORKFLOW_VERSION,
+  getNextStageId,
   getStageTitle,
   getStagesForProduct,
   WORKFLOW_STAGES,
 } from '@/constants/workflowStages'
 import { STALLED_ORDER_MS } from '@/constants/alerts'
-import { PRODUCT_LABELS, requiresRenovacao } from '@/constants/products'
+import { PRODUCT_LABELS, requiresRenovacao, skipsDeliveryTracking } from '@/constants/products'
 import { OPERADOR_FICTICIO } from '@/constants/users'
 import type {
   ChecklistItem,
@@ -574,14 +575,27 @@ export function completeStage({
     updatedOrder.history.push(scheduledEvent)
   }
 
-  // Fluxo operacional sequencial: 1 → 2 → 3 → 4 → 5 → 6
-  // Retirada na loja: após Expedição (3) pula Acompanhamento da Entrega (4).
-  let operationalNext = (stageId + 1) as WorkflowStageId
-  if (stageId === 3 && isStorePickup(order)) {
-    operationalNext = 5
+  // Fluxo operacional: usa o mapa do produto (ex.: LV-12 / Kit pulam etapa 4).
+  // Retirada na loja também pula Acompanhamento da Entrega.
+  let operationalNext = getNextStageId(stageId, order.product)
 
+  if (stageId === 3 && isStorePickup(order) && operationalNext === 4) {
+    operationalNext = 5
+  }
+
+  if (operationalNext == null) {
+    throw new WorkflowError('Próximo processo não encontrado.')
+  }
+
+  if (stageId === 3 && operationalNext === 5) {
     const deliveryStage = updatedOrder.stages[4]
     if (deliveryStage && !deliveryStage.finishedAt) {
+      const skipReason = isStorePickup(order)
+        ? 'retirada na loja'
+        : skipsDeliveryTracking(order.product)
+          ? `produto ${PRODUCT_LABELS[order.product]}`
+          : 'fluxo sem acompanhamento de entrega'
+
       updatedOrder.stages[4] = {
         ...deliveryStage,
         startedAt: deliveryStage.startedAt ?? occurredAt,
@@ -589,7 +603,7 @@ export function completeStage({
         responsible: operatorId,
         observations:
           deliveryStage.observations?.trim() ||
-          'Etapa dispensada — retirada na loja.',
+          `Etapa dispensada — ${skipReason}.`,
         checklist: deliveryStage.checklist.map((item) => ({
           ...item,
           checked: true,
@@ -603,8 +617,7 @@ export function completeStage({
         stageLabel: getStageTitle(4),
         occurredAt,
         responsible: operatorId,
-        message:
-          'Acompanhamento da Entrega dispensado (retirada na loja).',
+        message: `Acompanhamento da Entrega dispensado (${skipReason}).`,
         notes: '',
       })
       events.push(skippedEvent)

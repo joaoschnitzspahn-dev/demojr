@@ -1,5 +1,5 @@
 import type { ChecklistItem, ProductType, WorkflowStageId } from '@/types/workflow'
-import { requiresRenovacao } from '@/constants/products'
+import { requiresRenovacao, skipsDeliveryTracking } from '@/constants/products'
 
 /** Etapas operacionais (sem Renovação). */
 export const BASE_WORKFLOW_STAGES: WorkflowStageId[] = [1, 2, 3, 4, 5, 6]
@@ -183,8 +183,15 @@ export const getStageTitle = (stageId: WorkflowStageId) =>
   WORKFLOW_STAGES[stageId].title
 
 export function getStagesForProduct(product: ProductType): WorkflowStageId[] {
-  if (requiresRenovacao(product)) return [...ALL_WORKFLOW_STAGES]
-  return [...BASE_WORKFLOW_STAGES]
+  const stages = requiresRenovacao(product)
+    ? [...ALL_WORKFLOW_STAGES]
+    : [...BASE_WORKFLOW_STAGES]
+
+  if (skipsDeliveryTracking(product)) {
+    return stages.filter((id) => id !== 4)
+  }
+
+  return stages
 }
 
 export function getNextStageId(

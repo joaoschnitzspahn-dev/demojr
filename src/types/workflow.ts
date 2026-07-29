@@ -1,7 +1,7 @@
 /** Processos do fluxo (1–6 sempre; 7 só Mini Rastreador). */
 export type WorkflowStageId = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
-export type ProductType = 'mini_rastreador' | 'lv12_4g'
+export type ProductType = 'mini_rastreador' | 'lv12_4g' | 'kit_adesao'
 
 /** Forma de entrega definida na etapa Nota Fiscal e Etiqueta. */
 export type DeliveryMethod = 'shipping' | 'store_pickup'
