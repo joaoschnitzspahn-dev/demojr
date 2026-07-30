@@ -121,6 +121,16 @@ export function normalizeAppUser(user: AppUser): AppUser {
     validStages.includes(s)
   )
 
+  // Migração: Kemellyn passa a ter também o Pós-venda (etapa 6).
+  if (
+    user.login?.toLowerCase() === 'kemellyn' &&
+    !assignedStages.includes(6)
+  ) {
+    assignedStages = [...assignedStages, 6 as WorkflowStageId].sort(
+      (a, b) => a - b
+    )
+  }
+
   // Migração: quem tinha as 6 etapas antigas recebe a nova etapa 2 (NF) e 7 (Renovação).
   if (
     assignedStages.includes(1) &&
@@ -164,8 +174,8 @@ export function normalizeAppUser(user: AppUser): AppUser {
 
   if (teamSeed) {
     const stages =
-      Array.isArray(user.assignedStages) && user.assignedStages.length > 0
-        ? user.assignedStages.filter((s) => validStages.includes(s))
+      assignedStages.length > 0
+        ? assignedStages
         : [...teamSeed.assignedStages]
 
     return {
