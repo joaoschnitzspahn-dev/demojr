@@ -68,7 +68,7 @@ const TEAM_OPERATORS = [
     password: '123',
     name: 'Sara',
     role: 'operator',
-    assignedStages: [4, 6],
+    assignedStages: [4],
     active: true,
     createdAt: new Date(0).toISOString(),
   },

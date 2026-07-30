@@ -75,7 +75,7 @@ export const TEAM_OPERATORS: AppUser[] = [
     password: '123',
     name: 'Sara',
     role: 'operator',
-    assignedStages: [4, 6],
+    assignedStages: [4],
     active: true,
     createdAt: new Date(0).toISOString(),
   },
@@ -129,6 +129,14 @@ export function normalizeAppUser(user: AppUser): AppUser {
     assignedStages = [...assignedStages, 6 as WorkflowStageId].sort(
       (a, b) => a - b
     )
+  }
+
+  // Migração: Sara deixa de atuar no Pós-venda (etapa 6).
+  if (
+    user.login?.toLowerCase() === 'sara' &&
+    assignedStages.includes(6)
+  ) {
+    assignedStages = assignedStages.filter((s) => s !== 6)
   }
 
   // Migração: quem tinha as 6 etapas antigas recebe a nova etapa 2 (NF) e 7 (Renovação).
