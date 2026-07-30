@@ -118,7 +118,7 @@ export async function initDatabase() {
       '123',
       'Kemellyn',
       'operator',
-      JSON.stringify([1, 5]),
+      JSON.stringify([1, 5, 6]),
       'user-operator-josi',
       'josi',
       '123',

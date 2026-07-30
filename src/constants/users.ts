@@ -45,7 +45,7 @@ export const TEAM_OPERATORS: AppUser[] = [
     password: '123',
     name: 'Kemellyn',
     role: 'operator',
-    assignedStages: [1, 5],
+    assignedStages: [1, 5, 6],
     active: true,
     createdAt: new Date(0).toISOString(),
   },
